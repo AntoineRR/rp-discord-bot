@@ -8,21 +8,21 @@ impl Display for ParsingError {
 }
 
 pub enum Command {
-    PING,
+    Ping,
 }
 
 pub fn parse(message: &str) -> Result<Command, ParsingError> {
-    if !message.starts_with("!") {
+    if !message.starts_with('!') {
         return Err(ParsingError);
     }
     // Remove the "!" and separate command from arguments
-    let command_and_args: Vec<&str> = message[1..].split(" ").collect();
-    if command_and_args.len() < 1 {
+    let command_and_args: Vec<&str> = message[1..].split(' ').collect();
+    if command_and_args.is_empty() {
         return Err(ParsingError);
     }
     // Match the command to the enum
     match command_and_args[0] {
-        "ping" => Ok(Command::PING),
+        "ping" => Ok(Command::Ping),
         _ => Err(ParsingError),
     }
 }

@@ -22,7 +22,7 @@ impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
         if let Ok(command) = parser::parse(&msg.content) {
             let to_send = match command {
-                Command::PING => "pong!",
+                Command::Ping => "pong!",
             };
             if let Err(err) = msg.channel_id.say(&ctx.http, to_send).await {
                 println!("Error sending message: {:?}", err);
