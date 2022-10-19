@@ -1,0 +1,28 @@
+use std::fmt::Display;
+
+pub struct ParsingError;
+impl Display for ParsingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Couldn't parse message")
+    }
+}
+
+pub enum Command {
+    PING,
+}
+
+pub fn parse(message: &str) -> Result<Command, ParsingError> {
+    if !message.starts_with("!") {
+        return Err(ParsingError);
+    }
+    // Remove the "!" and separate command from arguments
+    let command_and_args: Vec<&str> = message[1..].split(" ").collect();
+    if command_and_args.len() < 1 {
+        return Err(ParsingError);
+    }
+    // Match the command to the enum
+    match command_and_args[0] {
+        "ping" => Ok(Command::PING),
+        _ => Err(ParsingError),
+    }
+}

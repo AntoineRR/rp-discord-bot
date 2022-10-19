@@ -1,5 +1,8 @@
+mod parser;
+
 use std::env;
 
+use parser::Command;
 use serenity::async_trait;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
@@ -17,8 +20,11 @@ impl EventHandler for Handler {
 
     /// Handler for the `message` event
     async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content == "!ping" {
-            if let Err(err) = msg.channel_id.say(&ctx.http, "Pong!").await {
+        if let Ok(command) = parser::parse(&msg.content) {
+            let to_send = match command {
+                Command::PING => "pong!",
+            };
+            if let Err(err) = msg.channel_id.say(&ctx.http, to_send).await {
                 println!("Error sending message: {:?}", err);
             }
         }
