@@ -9,6 +9,7 @@ impl Display for ParsingError {
 
 pub enum Command {
     Ping,
+    Roll,
 }
 
 pub fn parse(message: &str) -> Result<Command, ParsingError> {
@@ -23,6 +24,7 @@ pub fn parse(message: &str) -> Result<Command, ParsingError> {
     // Match the command to the enum
     match command_and_args[0] {
         "ping" => Ok(Command::Ping),
+        "roll" => Ok(Command::Roll),
         _ => Err(ParsingError),
     }
 }
