@@ -10,8 +10,11 @@ use serenity::async_trait;
 use serenity::client::{Context, EventHandler};
 use serenity::model::prelude::{Message, Ready};
 use serenity::prelude::*;
+use stats::{get_stats, Stat};
 
-struct Handler;
+struct Handler {
+    stats: Vec<Stat>, // The stat tree that will be used to select a stat
+}
 
 #[async_trait]
 impl EventHandler for Handler {
@@ -26,7 +29,7 @@ impl EventHandler for Handler {
         if let Ok(command) = parser::parse(&msg.content) {
             match command {
                 Command::Ping => ping(&ctx, &msg).await,
-                Command::Roll => roll(&ctx, &msg).await,
+                Command::Roll => roll(&ctx, &msg, &self.stats).await,
             };
         }
     }
@@ -46,7 +49,7 @@ async fn main() {
 
     // Create a new instance of the Client, logging in as a bot.
     let mut client = Client::builder(&token, intents)
-        .event_handler(Handler)
+        .event_handler(Handler { stats: get_stats() })
         .await
         .expect("Error creating client");
 

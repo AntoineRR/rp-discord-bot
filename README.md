@@ -18,6 +18,7 @@ Step 2: Serve your bot
 ```
 DISCORD_TOKEN=<your-token>
 ```
+- add a stats.txt file containing the stats you want, or use the one provided as an example
 - Run the app: `cargo run`
 
 ## TODO:
