@@ -10,10 +10,12 @@ use serenity::async_trait;
 use serenity::client::{Context, EventHandler};
 use serenity::model::prelude::{Message, Ready};
 use serenity::prelude::*;
-use stats::{get_stats, Stat};
+use stats::{get_players, get_stats, Player, Stat};
 
 struct Handler {
     stats: Vec<Stat>, // The stat tree that will be used to select a stat
+    #[allow(dead_code)]
+    players: Vec<Player>, // The player infos
 }
 
 #[async_trait]
@@ -49,7 +51,10 @@ async fn main() {
 
     // Create a new instance of the Client, logging in as a bot.
     let mut client = Client::builder(&token, intents)
-        .event_handler(Handler { stats: get_stats() })
+        .event_handler(Handler {
+            stats: get_stats(),
+            players: get_players(),
+        })
         .await
         .expect("Error creating client");
 

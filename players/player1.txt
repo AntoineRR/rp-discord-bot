@@ -1,0 +1,80 @@
+Lame courte: 45
+Lame longue: 17
+Hache: 56
+Masse: 23
+Arme de jet: 5
+Arme de trait: 6
+Arme longue: 12
+Poudre noire: 56
+Arme de siège: 178
+Combat à main: 23
+Force brute: 56
+Parade: 6
+Bouclier: 48
+Réactivité: 23
+Célérité: 130
+Agilité: 42
+Endurance physique: 74
+Résistance aux dommages physiques: 20
+Résistance aux éléments: 96
+Santé de fer: 78
+Résistance aux attaques magiques: 32
+Sang-froid: 5
+Cœur de pierre: 1
+Attendrissement: 78
+Charme: 89
+Aguichage: 230
+Intimiation: 42
+Rhétorique: 8
+Négoce: 63
+Géopolitique: 20
+Economie: 6
+Etiquette: 89
+Religion: 75
+Manipulation des émotions: 30
+Art Pictural: 10
+Art Musical: 50
+Art Théâtral: 42
+Art Littéraire: 78
+Artisanat du Cuir: 13
+Artisanat de la Pierre: 86
+Artisanat du Métal: 123
+Artisanat de la Terre: 7
+Artisanat du Bois: 3
+Artisanat du Tissu: 2
+Cuisine: 1
+Médecine: 14
+Gérilla: 26
+Navigation: 86
+Fouille/vol: 75
+Galérien: 49
+Dressage: 86
+Alchimie: 32
+Invocation: 75
+Enchantement: 48
+Pyromancie: 92
+Aquamentie: 75
+Fulgomancie: 1
+Caelimencie: 16
+Géomancie: 48
+Adamancie: 154
+Luxomancie: 11
+Noxomancie: 9
+Bénédiction: 46
+Malédiction: 37
+Résurrection: 15
+Nécromantie: 2
+Soins magiques: 20
+Psychokinésie: 80
+Métamorphose: 65
+Désenchantement: 38
+Envoûtement: 46
+Inquisition: 30
+Folie: 23
+Prémonition: 27
+Contrôle des Créatures: 19
+Contrôle de la Flore: 11
+Botanique: 10
+Bestiaire: 2
+Perception visuelle: 4
+Perception aveugle: 3

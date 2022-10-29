@@ -1,4 +1,7 @@
-use std::fs;
+use std::{
+    collections::HashMap,
+    fs::{self, read_dir},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Stat {
@@ -107,11 +110,58 @@ pub fn get_stats() -> Vec<Stat> {
     build_stat_tree(&parsed_lines, 0).sub_stats
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub struct Player {
+    pub name: String,
+    pub stats: HashMap<String, i32>,
+}
+
+impl Player {
+    pub fn from(name: &str, stats: HashMap<String, i32>) -> Self {
+        Player {
+            name: name.to_string(),
+            stats,
+        }
+    }
+}
+
+fn parse_player(name: &str, lines: &[&str]) -> Player {
+    let parse_line = |line: &str| {
+        let splitted: Vec<&str> = line.split(':').collect();
+        if splitted.len() != 2 {
+            panic!("Syntax error at line {line}");
+        }
+        let name = splitted[0].trim().to_string();
+        let value: i32 = splitted[1]
+            .trim()
+            .parse()
+            .unwrap_or_else(|_| panic!("Syntax error at line {line}"));
+        (name, value)
+    };
+
+    let parsed_stats = lines.iter().map(|line| parse_line(*line)).collect();
+    Player::from(name, parsed_stats)
+}
+
+pub fn get_players() -> Vec<Player> {
+    let player_paths = read_dir("./players").expect("You should have a 'players' directory");
+    player_paths
+        .map(|path| {
+            let file_name = path.as_ref().unwrap().file_name();
+            let raw = fs::read_to_string(&path.as_ref().unwrap().path()).unwrap();
+            let lines: Vec<&str> = raw.split('\n').filter(|line| !line.is_empty()).collect();
+            parse_player(file_name.to_str().unwrap(), &lines)
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use crate::stats::Stat;
 
-    use super::{build_stat_tree, ParsedLine};
+    use super::{build_stat_tree, parse_player, ParsedLine, Player};
 
     fn assert_vec_eq<T: PartialEq>(vec1: Vec<T>, vec2: Vec<T>) {
         assert!(vec1.iter().zip(vec2).all(|(v1, v2)| *v1 == v2));
@@ -129,7 +179,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_no_indent() {
+    fn parse_stats_no_indent() {
         let lines = ["Stat1", "Stat2", "Stat3"];
         let result = build_stat_tree(&get_parsed_lines(&lines), 0).sub_stats;
         let expected = vec![
@@ -141,7 +191,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_one_level_indent() {
+    fn parse_stats_one_level_indent() {
         let lines = ["Stat1", "    Stat2", "    Stat3"];
         let result = build_stat_tree(&get_parsed_lines(&lines), 0).sub_stats;
         let expected = vec![Stat::from(
@@ -152,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_multiple_one_level_indent() {
+    fn parse_stats_multiple_one_level_indent() {
         let lines = [
             "Stat1",
             "    Stat2",
@@ -176,7 +226,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_complex_indent() {
+    fn parse_stats_complex_indent() {
         let lines = [
             "Stat1",
             "    Stat2",
@@ -206,5 +256,18 @@ mod tests {
         ];
         println!("{:?}", result);
         assert_vec_eq(result, expected);
+    }
+
+    #[test]
+    fn parse_player_stats() {
+        let name = "Player1";
+        let lines = ["Stat1: 12", "Stat2: 5", "Stat3: 128"];
+        let mut parsed_stats = HashMap::new();
+        parsed_stats.insert("Stat1".to_string(), 12);
+        parsed_stats.insert("Stat2".to_string(), 5);
+        parsed_stats.insert("Stat3".to_string(), 128);
+        let result = parse_player(&name, &lines);
+        let expected = Player::from(name, parsed_stats);
+        assert_eq!(result, expected);
     }
 }
