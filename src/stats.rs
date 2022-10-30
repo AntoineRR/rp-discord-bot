@@ -3,6 +3,19 @@ use std::{
     fs::{self, read_dir},
 };
 
+fn clean_input(c: char) -> char {
+    let c = c.to_lowercase().next().unwrap();
+    match c {
+        'é' | 'è' | 'ê' | 'ë' => 'e',
+        'à' | 'â' => 'a',
+        'ï' => 'i',
+        'ô' => 'o',
+        'œ' => 'e',
+        ' ' | '-' | '/' => '_',
+        c => c,
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Stat {
     pub id: String,
@@ -20,21 +33,8 @@ impl Stat {
             )
         }
 
-        let clean_fn = |c: char| {
-            let c = c.to_lowercase().next().unwrap();
-            match c {
-                'é' | 'è' | 'ê' | 'ë' => 'e',
-                'à' | 'â' => 'a',
-                'ï' => 'i',
-                'ô' => 'o',
-                'œ' => 'e',
-                ' ' | '-' | '/' => '_',
-                c => c,
-            }
-        };
-
         Stat {
-            id: raw_line.trim().chars().map(clean_fn).collect(),
+            id: raw_line.trim().chars().map(clean_input).collect(),
             display_name: raw_line.trim().to_string(),
             sub_stats: sub_stats.to_vec(),
         }
@@ -113,25 +113,28 @@ pub fn get_stats() -> Vec<Stat> {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Player {
     pub name: String,
+    pub discord_name: String,
     pub stats: HashMap<String, i32>,
 }
 
 impl Player {
-    pub fn from(name: &str, stats: HashMap<String, i32>) -> Self {
+    pub fn from(name: &str, discord_name: &str, stats: HashMap<String, i32>) -> Self {
         Player {
             name: name.to_string(),
+            discord_name: discord_name.to_string(),
             stats,
         }
     }
 }
 
 fn parse_player(name: &str, lines: &[&str]) -> Player {
+    // TODO: check if all stats of the player are in the stat tree
     let parse_line = |line: &str| {
         let splitted: Vec<&str> = line.split(':').collect();
         if splitted.len() != 2 {
             panic!("Syntax error at line {line}");
         }
-        let name = splitted[0].trim().to_string();
+        let name = splitted[0].trim().chars().map(clean_input).collect();
         let value: i32 = splitted[1]
             .trim()
             .parse()
@@ -139,16 +142,21 @@ fn parse_player(name: &str, lines: &[&str]) -> Player {
         (name, value)
     };
 
-    let parsed_stats = lines.iter().map(|line| parse_line(*line)).collect();
-    Player::from(name, parsed_stats)
+    if lines.len() < 2 {
+        panic!("Please provide at least a discord name and one stat in your {name}.txt file");
+    }
+    let discord_name = lines[0].trim();
+    let parsed_stats = lines[1..].iter().map(|line| parse_line(*line)).collect();
+    Player::from(name, discord_name, parsed_stats)
 }
 
 pub fn get_players() -> Vec<Player> {
     let player_paths = read_dir("./players").expect("You should have a 'players' directory");
     player_paths
-        .map(|path| {
-            let file_name = path.as_ref().unwrap().file_name();
-            let raw = fs::read_to_string(&path.as_ref().unwrap().path()).unwrap();
+        .map(|p| {
+            let path = p.as_ref().unwrap().path();
+            let file_name = path.file_stem().unwrap();
+            let raw = fs::read_to_string(&path).unwrap();
             let lines: Vec<&str> = raw.split('\n').filter(|line| !line.is_empty()).collect();
             parse_player(file_name.to_str().unwrap(), &lines)
         })
@@ -261,13 +269,13 @@ mod tests {
     #[test]
     fn parse_player_stats() {
         let name = "Player1";
-        let lines = ["Stat1: 12", "Stat2: 5", "Stat3: 128"];
+        let lines = ["DiscordName1", "Stat1: 12", "Stat2: 5", "Stat3: 128"];
         let mut parsed_stats = HashMap::new();
-        parsed_stats.insert("Stat1".to_string(), 12);
-        parsed_stats.insert("Stat2".to_string(), 5);
-        parsed_stats.insert("Stat3".to_string(), 128);
+        parsed_stats.insert("stat1".to_string(), 12);
+        parsed_stats.insert("stat2".to_string(), 5);
+        parsed_stats.insert("stat3".to_string(), 128);
         let result = parse_player(&name, &lines);
-        let expected = Player::from(name, parsed_stats);
+        let expected = Player::from(name, "DiscordName1", parsed_stats);
         assert_eq!(result, expected);
     }
 }

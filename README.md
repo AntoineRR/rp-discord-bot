@@ -23,6 +23,6 @@ DISCORD_TOKEN=<your-token>
 
 ## TODO:
 
-- Read the stats for each player
-- Display if the roll failed/succeeded based on the stats
 - Increase a player experience based on the result of the roll
+- Add a shortcut for dice rolls (eg: !roll agility)
+- Add a command to view the xp / roll threshold for a stat

@@ -4,11 +4,13 @@ use async_recursion::async_recursion;
 use rand::{rngs::StdRng, Rng};
 use serenity::{
     builder::{CreateButton, CreateComponents},
-    model::prelude::{component::ButtonStyle, interaction::InteractionResponseType, Message},
+    model::prelude::{
+        component::ButtonStyle, interaction::InteractionResponseType, ChannelId, Message,
+    },
     prelude::Context,
 };
 
-use crate::stats::Stat;
+use crate::stats::{Player, Stat};
 
 /// Used for checking the bot is up and running
 /// The bot will only answer with "pong!"
@@ -46,7 +48,12 @@ fn buttons_from_stats<'a>(
 /// Updates the initial message until the user clicked an actual stat (leaf in the stat tree)
 /// Handle the recursion needed to go through the stat tree
 #[async_recursion]
-async fn choose_stat(context: &Context, msg: &Message, stats: &[Stat]) {
+async fn choose_stat<'a: 'async_recursion>(
+    context: &Context,
+    msg: &Message,
+    stats: &'a [Stat],
+    player: Option<&'a Player>,
+) {
     // Wait for a new interaction
     let interaction = match msg
         .await_component_interaction(&context)
@@ -79,7 +86,7 @@ async fn choose_stat(context: &Context, msg: &Message, stats: &[Stat]) {
             .unwrap();
 
         // Recursion to check the stat chosen by the user
-        choose_stat(context, msg, &stat.sub_stats).await;
+        choose_stat(context, msg, &stat.sub_stats, player).await;
     }
     // The stat has no substats, time to end the recursion
     else {
@@ -88,24 +95,75 @@ async fn choose_stat(context: &Context, msg: &Message, stats: &[Stat]) {
         let roll = rng.gen_range(1..101);
         println!("Rolled a {roll} for stat {}", stat.display_name);
 
+        // Create message
+        let mut message_content = "".to_string();
+        if let Some(p) = player {
+            message_content.push_str(&format!("**{}**\n", p.name));
+        }
+        message_content.push_str(&format!("**{}**: {}", stat.display_name, roll));
+        if let Some(p) = player {
+            // Find the limit for a success based on the experience in this stat
+            // TODO: allow customization of the function?
+            let threshold =
+                (100.0 - 99.0 * f64::exp(-*p.stats.get(&stat.id).unwrap() as f64 / 334.6)) as i32;
+            if roll > threshold {
+                message_content.push_str(&format!("/{threshold}\n**Failure**"));
+            } else {
+                message_content.push_str(&format!("/{threshold}\n**Success**"));
+            }
+        }
+
         // Update the message to display the result
         interaction
             .create_interaction_response(&context, |r| {
                 r.kind(InteractionResponseType::UpdateMessage)
-                    .interaction_response_data(|d| {
-                        d.content(format!("**{}**: {}", stat.display_name, roll))
-                            .components(|c| c)
-                    })
+                    .interaction_response_data(|d| d.content(&message_content).components(|c| c))
             })
             .await
             .unwrap();
     }
 }
 
+async fn player_not_found(ctx: &Context, channel_id: &ChannelId, discord_name: &str) -> bool {
+    let m = channel_id
+        .send_message(ctx, |m| {
+            m.content(format!(
+                "No player stats found for player {discord_name}.\nDo you still want to proceed?"
+            ))
+            .components(|c| {
+                c.create_action_row(|r| {
+                    r.add_button(button("yes", "Yes"));
+                    r.add_button(button("no", "No"))
+                })
+            })
+        })
+        .await
+        .unwrap();
+
+    let interaction = match m
+        .await_component_interaction(&ctx)
+        .timeout(Duration::from_secs(3 * 60))
+        .await
+    {
+        Some(x) => x,
+        None => {
+            panic!("Timed out");
+        }
+    };
+
+    let answer = &interaction.data.custom_id;
+    answer != "no"
+}
+
 /// Roll a dice for the stat you choose
 /// The dice follows a uniform distribution
-pub async fn roll(ctx: &Context, msg: &Message, stats: &[Stat]) {
+pub async fn roll(ctx: &Context, msg: &Message, stats: &[Stat], players: &[Player]) {
     let channel_id = msg.channel_id;
+    let discord_name = &msg.author.name;
+    let player = players.iter().find(|&p| &p.discord_name == discord_name);
+    if player.is_none() && player_not_found(ctx, &channel_id, discord_name).await {
+        return;
+    }
 
     // Create the initial message that is going to be updated based on the user's choices
     let m = channel_id
@@ -117,5 +175,5 @@ pub async fn roll(ctx: &Context, msg: &Message, stats: &[Stat]) {
         .unwrap();
 
     // Guide the user through the stat tree to choose a stat
-    choose_stat(ctx, &m, stats).await;
+    choose_stat(ctx, &m, stats, player).await;
 }

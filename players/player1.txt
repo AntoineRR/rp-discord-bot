@@ -1,3 +1,4 @@
+Player1
 Lame courte: 45
 Lame longue: 17
 Hache: 56

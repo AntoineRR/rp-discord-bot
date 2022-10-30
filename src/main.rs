@@ -31,7 +31,7 @@ impl EventHandler for Handler {
         if let Ok(command) = parser::parse(&msg.content) {
             match command {
                 Command::Ping => ping(&ctx, &msg).await,
-                Command::Roll => roll(&ctx, &msg, &self.stats).await,
+                Command::Roll => roll(&ctx, &msg, &self.stats, &self.players).await,
             };
         }
     }
