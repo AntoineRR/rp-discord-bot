@@ -124,7 +124,11 @@ async fn choose_stat<'a: 'async_recursion>(
     }
 }
 
-async fn player_not_found(ctx: &Context, channel_id: &ChannelId, discord_name: &str) -> bool {
+async fn proceed_without_player_stats(
+    ctx: &Context,
+    channel_id: &ChannelId,
+    discord_name: &str,
+) -> bool {
     let m = channel_id
         .send_message(ctx, |m| {
             m.content(format!(
@@ -152,7 +156,28 @@ async fn player_not_found(ctx: &Context, channel_id: &ChannelId, discord_name: &
     };
 
     let answer = &interaction.data.custom_id;
-    answer != "no"
+    if answer == "no" {
+        interaction
+            .create_interaction_response(&ctx, |r| {
+                r.kind(InteractionResponseType::UpdateMessage)
+                    .interaction_response_data(|d| d.content("Command aborted").components(|c| c))
+            })
+            .await
+            .unwrap();
+        return false;
+    } else {
+        interaction
+            .create_interaction_response(&ctx, |r| {
+                r.kind(InteractionResponseType::UpdateMessage)
+                    .interaction_response_data(|d| {
+                        d.content("Stat experience will not be updated")
+                            .components(|c| c)
+                    })
+            })
+            .await
+            .unwrap();
+        return true;
+    }
 }
 
 /// Roll a dice for the stat you choose
@@ -161,7 +186,7 @@ pub async fn roll(ctx: &Context, msg: &Message, stats: &[Stat], players: &[Playe
     let channel_id = msg.channel_id;
     let discord_name = &msg.author.name;
     let player = players.iter().find(|&p| &p.discord_name == discord_name);
-    if player.is_none() && player_not_found(ctx, &channel_id, discord_name).await {
+    if player.is_none() && !proceed_without_player_stats(ctx, &channel_id, discord_name).await {
         return;
     }
 
