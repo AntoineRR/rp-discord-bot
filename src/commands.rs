@@ -164,7 +164,7 @@ async fn proceed_without_player_stats(
             })
             .await
             .unwrap();
-        return false;
+        false
     } else {
         interaction
             .create_interaction_response(&ctx, |r| {
@@ -176,7 +176,7 @@ async fn proceed_without_player_stats(
             })
             .await
             .unwrap();
-        return true;
+        true
     }
 }
 
