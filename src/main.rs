@@ -13,8 +13,7 @@ use serenity::prelude::*;
 use stats::{get_players, get_stats, Player, Stat};
 
 struct Handler {
-    stats: Vec<Stat>, // The stat tree that will be used to select a stat
-    #[allow(dead_code)]
+    stats: Vec<Stat>,     // The stat tree that will be used to select a stat
     players: Vec<Player>, // The player infos
 }
 
