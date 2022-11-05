@@ -19,12 +19,12 @@ Step 2: Serve your bot
 DISCORD_TOKEN=<your-token>
 ```
 - add a stats.txt file containing the stats you want, or use the one provided as an example
-- add a file for each of your player in the `players` folder. The name of the file is the name of the player, the first line is the discord name of the player, and the remaining lines specify the experience of the player for each stat. Use `players/player1.txt` as a reference.
+- add a file for each of your player in the `players` folder. This file specifies the name of the player, his name in Discord, and the experience of the player in each stat. Use `players/player1.json` as a reference.
+- the `config.json` file allows for some app configuration.
 - Run the app: `cargo run`
 
 ## TODO:
 
-- Add a config file to specify the experience to add for each roll, among other things
-- Increase a player experience based on the result of the roll
+- Clean code
 - Add a shortcut for dice rolls (eg: !roll agility)
 - Add a command to view the xp / roll threshold for a stat

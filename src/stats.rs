@@ -3,6 +3,8 @@ use std::{
     fs::{self, read_dir},
 };
 
+use serde::{Deserialize, Serialize};
+
 fn clean_input(c: char) -> char {
     let c = c.to_lowercase().next().unwrap();
     match c {
@@ -110,44 +112,30 @@ pub fn get_stats() -> Vec<Stat> {
     build_stat_tree(&parsed_lines, 0).sub_stats
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Player {
+    #[serde(skip)]
+    path: String,
     pub name: String,
     pub discord_name: String,
     pub stats: HashMap<String, i32>,
 }
 
 impl Player {
-    pub fn from(name: &str, discord_name: &str, stats: HashMap<String, i32>) -> Self {
-        Player {
-            name: name.to_string(),
-            discord_name: discord_name.to_string(),
-            stats,
-        }
+    pub fn from(path: &str) -> Self {
+        let mut value: Player =
+            serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+        value.path = path.to_string();
+        value
     }
-}
 
-fn parse_player(name: &str, lines: &[&str]) -> Player {
-    // TODO: check if all stats of the player are in the stat tree
-    let parse_line = |line: &str| {
-        let splitted: Vec<&str> = line.split(':').collect();
-        if splitted.len() != 2 {
-            panic!("Syntax error at line {line}");
-        }
-        let name = splitted[0].trim().chars().map(clean_input).collect();
-        let value: i32 = splitted[1]
-            .trim()
-            .parse()
-            .unwrap_or_else(|_| panic!("Syntax error at line {line}"));
-        (name, value)
-    };
-
-    if lines.len() < 2 {
-        panic!("Please provide at least a discord name and one stat in your {name}.txt file");
+    pub fn increase_experience(&mut self, exp_to_add: i32, stat_name: &str) {
+        self.stats
+            .entry(stat_name.to_string())
+            .and_modify(|value| *value += exp_to_add);
+        let to_save = serde_json::to_string_pretty(self).unwrap();
+        std::fs::write(&self.path, to_save).unwrap();
     }
-    let discord_name = lines[0].trim();
-    let parsed_stats = lines[1..].iter().map(|line| parse_line(*line)).collect();
-    Player::from(name, discord_name, parsed_stats)
 }
 
 pub fn get_players() -> Vec<Player> {
@@ -155,21 +143,17 @@ pub fn get_players() -> Vec<Player> {
     player_paths
         .map(|p| {
             let path = p.as_ref().unwrap().path();
-            let file_name = path.file_stem().unwrap();
-            let raw = fs::read_to_string(&path).unwrap();
-            let lines: Vec<&str> = raw.split('\n').filter(|line| !line.is_empty()).collect();
-            parse_player(file_name.to_str().unwrap(), &lines)
+            let path_str = path.as_os_str().to_str().unwrap();
+            Player::from(path_str)
         })
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use crate::stats::Stat;
 
-    use super::{build_stat_tree, parse_player, ParsedLine, Player};
+    use super::{build_stat_tree, ParsedLine};
 
     fn assert_vec_eq<T: PartialEq>(vec1: Vec<T>, vec2: Vec<T>) {
         assert!(vec1.iter().zip(vec2).all(|(v1, v2)| *v1 == v2));
@@ -264,18 +248,5 @@ mod tests {
         ];
         println!("{:?}", result);
         assert_vec_eq(result, expected);
-    }
-
-    #[test]
-    fn parse_player_stats() {
-        let name = "Player1";
-        let lines = ["DiscordName1", "Stat1: 12", "Stat2: 5", "Stat3: 128"];
-        let mut parsed_stats = HashMap::new();
-        parsed_stats.insert("stat1".to_string(), 12);
-        parsed_stats.insert("stat2".to_string(), 5);
-        parsed_stats.insert("stat3".to_string(), 128);
-        let result = parse_player(&name, &lines);
-        let expected = Player::from(name, "DiscordName1", parsed_stats);
-        assert_eq!(result, expected);
     }
 }
