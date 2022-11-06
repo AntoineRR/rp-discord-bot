@@ -3,50 +3,15 @@ use std::time::Duration;
 use async_recursion::async_recursion;
 use rand::{rngs::StdRng, Rng};
 use serenity::{
-    builder::{CreateButton, CreateComponents},
-    model::prelude::{
-        component::ButtonStyle, interaction::InteractionResponseType, ChannelId, Message,
-    },
+    model::prelude::{interaction::InteractionResponseType, ChannelId, Message},
     prelude::Context,
 };
 
 use crate::{
+    commands::utils::{button, buttons_from_stats},
     stats::{Player, Stat},
     Config, State,
 };
-
-/// Used for checking the bot is up and running
-/// The bot will only answer with "pong!"
-pub async fn ping(ctx: &Context, msg: &Message) {
-    if let Err(err) = msg.channel_id.say(&ctx.http, "pong!").await {
-        println!("Error sending message: {:?}", err);
-    }
-}
-
-/// Build a button based on an id and display string
-fn button(id: &str, display_name: &str) -> CreateButton {
-    let mut b = CreateButton::default();
-    b.custom_id(id);
-    b.label(display_name);
-    b.style(ButtonStyle::Primary);
-    b
-}
-
-/// Build a set of rows containing 5 buttons each at most
-fn buttons_from_stats<'a>(
-    components: &'a mut CreateComponents,
-    stats: &[Stat],
-) -> &'a mut CreateComponents {
-    stats.chunks(5).for_each(|chunk| {
-        components.create_action_row(|row| {
-            chunk.iter().for_each(|stat| {
-                row.add_button(button(&stat.id, &stat.display_name));
-            });
-            row
-        });
-    });
-    components
-}
 
 /// Updates the initial message until the user clicked an actual stat (leaf in the stat tree)
 /// Handle the recursion needed to go through the stat tree

@@ -1,17 +1,17 @@
 use std::fmt::Display;
 
+use crate::commands::Command;
+
+/// Returned when the parsing of a command failed
 pub struct ParsingError;
+
 impl Display for ParsingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Couldn't parse message")
     }
 }
 
-pub enum Command {
-    Ping,
-    Roll,
-}
-
+/// Parse a message to find out if it was a command and return it
 pub fn parse(message: &str) -> Result<Command, ParsingError> {
     if !message.starts_with('!') {
         return Err(ParsingError);
