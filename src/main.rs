@@ -2,10 +2,10 @@ use std::borrow::BorrowMut;
 use std::env;
 use std::sync::Arc;
 
+use rp_tool::commands::parser::parse;
 use rp_tool::commands::ping::ping;
 use rp_tool::commands::roll::roll;
 use rp_tool::commands::Command;
-use rp_tool::parser::parse;
 use rp_tool::State;
 use serenity::client::{Context, EventHandler};
 use serenity::model::prelude::{Message, Ready};
@@ -57,11 +57,17 @@ async fn main() {
         .await
         .expect("Error creating client");
 
+    // Parse the config files and save them
+    let state = match State::from_config_files() {
+        Ok(s) => s,
+        Err(e) => panic!("An error occurred while parsing your config files: {e}"),
+    };
+
     // Add our global state to the client
     // Wrapped in a block to close the write lock before starting the client
     {
         let mut data = client.data.write().await;
-        data.insert::<State>(Arc::new(Mutex::new(State::default())));
+        data.insert::<State>(Arc::new(Mutex::new(state)));
     }
     // Finally, start a single shard, and start listening to events.
     if let Err(err) = client.start().await {

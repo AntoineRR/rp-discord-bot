@@ -8,7 +8,8 @@ use serenity::{
 
 use crate::{
     commands::utils::{update_interaction_with_stats, wait_for_interaction},
-    stats::{Player, Stat},
+    players::Player,
+    stats::Stat,
     Config, State,
 };
 
@@ -70,14 +71,14 @@ async fn choose_stat<'a: 'async_recursion>(
                     p.increase_experience(
                         config.experience_earned_after_failure,
                         &stat.display_name,
-                    );
+                    )?;
                 } else {
                     message_content.push_str(&format!("/{threshold}\n**Success**"));
                     // Increase experience
                     p.increase_experience(
                         config.experience_earned_after_success,
                         &stat.display_name,
-                    );
+                    )?;
                 }
             }
             None => {

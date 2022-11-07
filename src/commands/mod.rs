@@ -1,5 +1,6 @@
 use std::fmt::Display;
 
+pub mod parser;
 pub mod ping;
 pub mod roll;
 pub mod utils;

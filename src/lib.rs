@@ -1,11 +1,14 @@
 use std::sync::Arc;
 
+use anyhow::Result;
+
+use players::{get_players, Player};
 use serde::{Deserialize, Serialize};
 use serenity::prelude::{Mutex, TypeMapKey};
-use stats::{get_players, get_stats, Player, Stat};
+use stats::{get_stats, Stat};
 
 pub mod commands;
-pub mod parser;
+mod players;
 mod stats;
 
 /// Corresponds to the customizable config file that can be modified by the user
@@ -34,17 +37,11 @@ impl TypeMapKey for State {
 }
 
 impl State {
-    pub fn new() -> Self {
-        State {
+    pub fn from_config_files() -> Result<Self> {
+        Ok(State {
             config: Config::from("./config.json"),
-            stats: get_stats(),
-            players: get_players(),
-        }
-    }
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self::new()
+            stats: get_stats()?,
+            players: get_players()?,
+        })
     }
 }
