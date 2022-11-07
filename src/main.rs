@@ -27,10 +27,14 @@ impl EventHandler for Handler {
         let data = ctx.data.read().await;
         let state = data.get::<State>().unwrap().clone();
         if let Ok(command) = parse(&msg.content) {
-            match command {
+            if let Err(e) = match command {
                 Command::Ping => ping(&ctx, &msg).await,
                 Command::Roll => roll(&ctx, &msg, state.lock().await.borrow_mut()).await,
-            };
+            } {
+                println!("Failed to execute {command} command: {e}");
+            } else {
+                println!("Executed {command} command successfully");
+            }
         }
     }
 }

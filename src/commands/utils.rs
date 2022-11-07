@@ -1,6 +1,13 @@
+use std::{sync::Arc, time::Duration};
+
+use anyhow::{Context, Result};
 use serenity::{
     builder::{CreateButton, CreateComponents},
-    model::prelude::component::ButtonStyle,
+    model::prelude::{
+        component::ButtonStyle,
+        interaction::{message_component::MessageComponentInteraction, InteractionResponseType},
+        ChannelId, Message,
+    },
 };
 
 use crate::stats::Stat;
@@ -28,4 +35,85 @@ pub fn buttons_from_stats<'a>(
         });
     });
     components
+}
+
+/// Build a row with a yes and a no button
+pub fn yes_no_buttons(components: &mut CreateComponents) -> &mut CreateComponents {
+    components.create_action_row(|row| {
+        row.add_button(button("yes", "Yes"));
+        row.add_button(button("no", "No"))
+    })
+}
+
+/// Send a message asking to choose between the given stats
+pub async fn send_choose_stats_message(
+    ctx: &serenity::prelude::Context,
+    channel_id: &ChannelId,
+    content: &str,
+    stats: &[Stat],
+) -> Result<Message> {
+    channel_id
+        .send_message(&ctx, |m| {
+            m.content(content)
+                .components(|c| buttons_from_stats(c, stats))
+        })
+        .await
+        .context("Failed to write message")
+}
+
+/// Send a message asking the user to answer a question with yes or no
+pub async fn send_yes_no_message(
+    ctx: &serenity::prelude::Context,
+    channel_id: &ChannelId,
+    content: &str,
+) -> Result<Message> {
+    channel_id
+        .send_message(ctx, |m| m.content(content).components(yes_no_buttons))
+        .await
+        .context("Failed to write message")
+}
+
+/// Wait for an interaction on the given message and return it
+pub async fn wait_for_interaction(
+    ctx: &serenity::prelude::Context,
+    msg: &Message,
+) -> Result<Arc<MessageComponentInteraction>> {
+    msg.await_component_interaction(&ctx)
+        .timeout(Duration::from_secs(3 * 60))
+        .await
+        .context("Interaction timed out")
+}
+
+/// Update the message with a new stat choice
+pub async fn update_interaction_with_stats(
+    ctx: &serenity::prelude::Context,
+    interaction: &MessageComponentInteraction,
+    content: &str,
+    stats: &[Stat],
+) -> Result<()> {
+    interaction
+        .create_interaction_response(ctx, |r| {
+            r.kind(InteractionResponseType::UpdateMessage)
+                .interaction_response_data(|d| {
+                    d.content(content)
+                        .components(|c| buttons_from_stats(c, stats))
+                })
+        })
+        .await
+        .context("Failed to update message")
+}
+
+/// Conclude an interaction by updating the message to a non interactive one
+pub async fn finish_interaction(
+    ctx: &serenity::prelude::Context,
+    interaction: &MessageComponentInteraction,
+    content: &str,
+) -> Result<()> {
+    interaction
+        .create_interaction_response(&ctx, |r| {
+            r.kind(InteractionResponseType::UpdateMessage)
+                .interaction_response_data(|d| d.content(content).components(|c| c))
+        })
+        .await
+        .context("Failed to update message")
 }
