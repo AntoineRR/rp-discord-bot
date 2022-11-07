@@ -25,6 +25,6 @@ DISCORD_TOKEN=<your-token>
 
 ## TODO:
 
-- Clean code
+- Add affinities which provide bonuses to some stats
 - Add a shortcut for dice rolls (eg: !roll agility)
 - Add a command to view the xp / roll threshold for a stat
