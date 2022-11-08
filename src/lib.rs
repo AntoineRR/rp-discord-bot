@@ -6,6 +6,7 @@ use players::{get_players, Player};
 use serde::{Deserialize, Serialize};
 use serenity::prelude::{Mutex, TypeMapKey};
 use stats::{get_stats, Stat};
+use tracing::info;
 
 pub mod commands;
 mod players;
@@ -39,6 +40,7 @@ impl TypeMapKey for State {
 impl State {
     pub fn from_config_files() -> Result<Self> {
         let config_folder = "./config";
+        info!("Loading config from {}", config_folder);
         Ok(State {
             config: Config::from(&format!("{}/config.json", config_folder)),
             stats: get_stats(&format!("{}/stats.txt", config_folder))?,

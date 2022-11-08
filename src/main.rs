@@ -1,5 +1,6 @@
 use std::borrow::BorrowMut;
 use std::env;
+use std::process::exit;
 use std::sync::Arc;
 
 use rp_tool::commands::parser::parse;
@@ -11,6 +12,7 @@ use serenity::client::{Context, EventHandler};
 use serenity::model::prelude::{Message, Ready};
 use serenity::prelude::{GatewayIntents, Mutex};
 use serenity::{async_trait, Client};
+use tracing::{error, info};
 
 struct Handler;
 
@@ -19,7 +21,7 @@ impl EventHandler for Handler {
     /// Handler for the `ready` event
     /// Called when the bot joins the server
     async fn ready(&self, _: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
+        info!("{} is connected!", ready.user.name);
     }
 
     /// Handler for the `message` event
@@ -27,13 +29,14 @@ impl EventHandler for Handler {
         let data = ctx.data.read().await;
         let state = data.get::<State>().unwrap().clone();
         if let Ok(command) = parse(&msg.content) {
+            info!("Received '{command}' command from {}", &msg.author.name);
             if let Err(e) = match command {
                 Command::Ping => ping(&ctx, &msg).await,
                 Command::Roll => roll(&ctx, &msg, state.lock().await.borrow_mut()).await,
             } {
-                println!("Failed to execute {command} command: {e}");
+                error!("Failed to execute {command} command: {e}");
             } else {
-                println!("Executed {command} command successfully");
+                info!("Executed {command} command successfully");
             }
         }
     }
@@ -41,9 +44,19 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() {
+    // Setup tracing
+    let subscriber = tracing_subscriber::FmtSubscriber::new();
+    tracing::subscriber::set_global_default(subscriber)
+        .map_err(|e| eprintln!("Unable to set global default subscriber: {e}"))
+        .ok();
+
     // Get the discord token from a .env file
     dotenv::dotenv().ok();
-    let token = env::var("DISCORD_TOKEN").expect("Expected a discord token in the .env file");
+    let token = env::var("DISCORD_TOKEN").unwrap_or_else(|e| {
+        error!("Expected a discord token in the .env file: {e}");
+        exit(1);
+    });
+    info!("Found discord token in .env file");
 
     // Set gateway intents, which decides what events the bot will be notified about
     // The MESSAGE_CONTENT intent requires special authorizations for the bot
@@ -55,13 +68,21 @@ async fn main() {
     let mut client = Client::builder(&token, intents)
         .event_handler(Handler)
         .await
-        .expect("Error creating client");
+        .unwrap_or_else(|e| {
+            error!("Error creating client: {e}");
+            exit(1);
+        });
+    info!("Client is setup");
 
     // Parse the config files and save them
     let state = match State::from_config_files() {
         Ok(s) => s,
-        Err(e) => panic!("An error occurred while parsing your config files: {e}"),
+        Err(e) => {
+            error!("An error occurred while parsing your config files: {e}");
+            exit(1);
+        }
     };
+    info!("Config files loaded successfully");
 
     // Add our global state to the client
     // Wrapped in a block to close the write lock before starting the client
@@ -71,6 +92,7 @@ async fn main() {
     }
     // Finally, start a single shard, and start listening to events.
     if let Err(err) = client.start().await {
-        println!("Client error: {:?}", err);
+        error!("Client error: {:?}", err);
+        exit(1);
     }
 }

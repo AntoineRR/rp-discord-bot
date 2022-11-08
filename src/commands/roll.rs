@@ -5,6 +5,7 @@ use serenity::{
     model::prelude::{ChannelId, Message},
     prelude::Context,
 };
+use tracing::{error, info, warn};
 
 use crate::{
     commands::utils::{update_interaction_with_stats, wait_for_interaction},
@@ -31,11 +32,12 @@ async fn choose_stat<'a: 'async_recursion>(
     // Get the stat selected by the user
     let stat_id = &interaction.data.custom_id;
     let stat = stats.iter().find(|&s| &s.id == stat_id).unwrap().clone();
-    println!("Selected stat {}", stat.display_name);
+    info!("Selected stat {}", stat.display_name);
 
     // If the stat has substats, we should let the user select one
     if !stat.sub_stats.is_empty() {
         // Update the message to display the substats
+        info!("Asking user to choose a stat");
         update_interaction_with_stats(
             ctx,
             &interaction,
@@ -52,7 +54,7 @@ async fn choose_stat<'a: 'async_recursion>(
         // Roll a dice
         let mut rng: StdRng = rand::SeedableRng::from_entropy();
         let roll = rng.gen_range(1..101);
-        println!("Rolled a {roll} for stat {}", stat.display_name);
+        info!("Rolled a {roll} for stat {}", stat.display_name);
 
         // Create message
         let mut message_content = "".to_string();
@@ -66,13 +68,17 @@ async fn choose_stat<'a: 'async_recursion>(
                     - 99.0 * f64::exp(-*p.stats.get(&stat.display_name).unwrap() as f64 / 334.6))
                     as i32;
                 if roll > threshold {
+                    info!("Player {} failed the check: {roll}/{threshold}", p.name);
                     message_content.push_str(&format!("/{threshold}\n**Failure**"));
                     // Increase experience
-                    p.increase_experience(
+                    if let Err(e) = p.increase_experience(
                         config.experience_earned_after_failure,
                         &stat.display_name,
-                    )?;
+                    ) {
+                        error!("Something went wrong when updating the player experience: {e}")
+                    }
                 } else {
+                    info!("Player {} passed the check: {roll}/{threshold}", p.name);
                     message_content.push_str(&format!("/{threshold}\n**Success**"));
                     // Increase experience
                     p.increase_experience(
@@ -121,17 +127,24 @@ async fn proceed_without_player_stats(
 pub async fn roll(ctx: &Context, msg: &Message, state: &mut State) -> Result<()> {
     let channel_id = msg.channel_id;
     let discord_name = &msg.author.name;
+
+    // Getting info for the player from his discord name
+    info!("Retrieving player info for {discord_name}");
     let player = state
         .players
         .iter_mut()
         .find(|p| &p.discord_name == discord_name)
         .cloned();
     if player.is_none() {
+        warn!("Could not find info for player {discord_name}");
         proceed_without_player_stats(ctx, &channel_id, discord_name).await?;
-        println!("Proceeding...");
+        info!("Proceeding without info");
+    } else {
+        info!("Successfully retrieved player info for {discord_name}");
     }
 
     // Create the initial message that is going to be updated based on the user's choices
+    info!("Asking user to choose a stat");
     let m = send_choose_stats_message(
         ctx,
         &channel_id,
