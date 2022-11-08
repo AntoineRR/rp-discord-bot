@@ -8,13 +8,21 @@ use serenity::{
 use tracing::{error, info, warn};
 
 use crate::{
-    commands::utils::{update_interaction_with_stats, wait_for_interaction},
+    commands::utils::{display_result, update_interaction_with_stats, wait_for_interaction},
     players::Player,
     stats::Stat,
     Config, State,
 };
 
 use super::utils::{finish_interaction, send_choose_stats_message, send_yes_no_message};
+
+pub struct RollResult {
+    pub stat: String,
+    pub player_name: Option<String>,
+    pub roll: i32,
+    pub threshold: Option<i32>,
+    pub successful: Option<bool>,
+}
 
 /// Updates the initial message until the user clicked an actual stat (leaf in the stat tree)
 /// Handle the recursion needed to go through the stat tree
@@ -56,44 +64,44 @@ async fn choose_stat<'a: 'async_recursion>(
         let roll = rng.gen_range(1..101);
         info!("Rolled a {roll} for stat {}", stat.display_name);
 
-        // Create message
-        let mut message_content = "".to_string();
-        match player {
+        // Prepare info for the final message
+        let roll_result = match player {
             Some(mut p) => {
-                message_content.push_str(&format!("**{}**\n", p.name));
-                message_content.push_str(&format!("**{}**: {}", stat.display_name, roll));
                 // Find the limit for a success based on the experience in this stat
                 // TODO: allow customization of the function?
-                let threshold = (100.0
-                    - 99.0 * f64::exp(-*p.stats.get(&stat.display_name).unwrap() as f64 / 334.6))
-                    as i32;
-                if roll > threshold {
+                let player_experience = *p.stats.get(&stat.display_name).unwrap();
+                let threshold = (100.0 - 99.0 * f64::exp(-player_experience as f64 / 334.6)) as i32;
+                let (successful, experience_earned) = if roll > threshold {
                     info!("Player {} failed the check: {roll}/{threshold}", p.name);
-                    message_content.push_str(&format!("/{threshold}\n**Failure**"));
-                    // Increase experience
-                    if let Err(e) = p.increase_experience(
-                        config.experience_earned_after_failure,
-                        &stat.display_name,
-                    ) {
-                        error!("Something went wrong when updating the player experience: {e}")
-                    }
+                    (false, config.experience_earned_after_failure)
                 } else {
                     info!("Player {} passed the check: {roll}/{threshold}", p.name);
-                    message_content.push_str(&format!("/{threshold}\n**Success**"));
-                    // Increase experience
-                    p.increase_experience(
-                        config.experience_earned_after_success,
-                        &stat.display_name,
-                    )?;
+                    (true, config.experience_earned_after_success)
+                };
+
+                if let Err(e) = p.increase_experience(experience_earned, &stat.display_name) {
+                    error!("Something went wrong when updating the player experience: {e}")
+                }
+
+                RollResult {
+                    stat: stat.display_name.to_string(),
+                    player_name: Some(p.name),
+                    roll,
+                    threshold: Some(threshold),
+                    successful: Some(successful),
                 }
             }
-            None => {
-                message_content.push_str(&format!("**{}**: {}", stat.display_name, roll));
-            }
+            None => RollResult {
+                stat: stat.display_name.to_string(),
+                player_name: None,
+                roll,
+                threshold: None,
+                successful: None,
+            },
         };
 
         // Update the message to display the result
-        finish_interaction(ctx, &interaction, &message_content).await?;
+        display_result(ctx, &interaction, &roll_result).await?;
     }
     Ok(())
 }

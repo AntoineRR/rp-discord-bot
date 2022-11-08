@@ -12,6 +12,8 @@ use serenity::{
 
 use crate::stats::Stat;
 
+use super::roll::RollResult;
+
 /// Build a button based on an id and display string
 pub fn button(id: &str, display_name: &str) -> CreateButton {
     let mut b = CreateButton::default();
@@ -110,9 +112,40 @@ pub async fn finish_interaction(
     content: &str,
 ) -> Result<()> {
     interaction
-        .create_interaction_response(&ctx, |r| {
+        .create_interaction_response(ctx, |r| {
             r.kind(InteractionResponseType::UpdateMessage)
                 .interaction_response_data(|d| d.content(content).components(|c| c))
+        })
+        .await
+        .context("Failed to update message")
+}
+
+pub async fn display_result(
+    ctx: &serenity::prelude::Context,
+    interaction: &MessageComponentInteraction,
+    roll_result: &RollResult,
+) -> Result<()> {
+    let title = match &roll_result.successful {
+        Some(true) => "SUCCESS",
+        Some(false) => "FAILURE",
+        None => "",
+    };
+    let description = match &roll_result.player_name {
+        Some(n) => format!("**{n}** / *{}*", &roll_result.stat),
+        None => format!("*{}*", &roll_result.stat),
+    };
+    let mut fields = vec![("Roll", format!("*{}*", &roll_result.roll), true)];
+    if let Some(t) = roll_result.threshold {
+        fields.push(("Stat", format!("*{t}*"), true));
+    }
+    interaction
+        .create_interaction_response(ctx, |r| {
+            r.kind(InteractionResponseType::UpdateMessage)
+                .interaction_response_data(|d| {
+                    d.content("")
+                        .embed(|e| e.title(title).description(description).fields(fields))
+                        .components(|c| c)
+                })
         })
         .await
         .context("Failed to update message")
