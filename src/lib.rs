@@ -38,10 +38,11 @@ impl TypeMapKey for State {
 
 impl State {
     pub fn from_config_files() -> Result<Self> {
+        let config_folder = "./config";
         Ok(State {
-            config: Config::from("./config.json"),
-            stats: get_stats()?,
-            players: get_players()?,
+            config: Config::from(&format!("{}/config.json", config_folder)),
+            stats: get_stats(&format!("{}/stats.txt", config_folder))?,
+            players: get_players(&format!("{}/players", config_folder))?,
         })
     }
 }

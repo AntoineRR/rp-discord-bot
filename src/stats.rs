@@ -96,8 +96,8 @@ fn build_stat_tree(lines: &[ParsedLine], index: usize) -> Result<Stat> {
 }
 
 /// Get the stat tree from the stats.txt file
-pub fn get_stats() -> Result<Vec<Stat>> {
-    let file_content = fs::read_to_string("./stats.txt").expect("Could not read stats file");
+pub fn get_stats(path: &str) -> Result<Vec<Stat>> {
+    let file_content = fs::read_to_string(path).expect("Could not read stats file");
     // A root node is needed to build the Stat tree
     let mut parsed_lines = vec![ParsedLine::root()];
     parsed_lines.append(

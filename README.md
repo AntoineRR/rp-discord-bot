@@ -18,10 +18,10 @@ Step 2: Serve your bot
 ```
 DISCORD_TOKEN=<your-token>
 ```
-- add a stats.txt file containing the stats you want, or use the one provided as an example
-- add a file for each of your player in the `players` folder. This file specifies the name of the player, his name in Discord, and the experience of the player in each stat. Use `players/player1.json` as a reference.
-- the `config.json` file allows for some app configuration.
-- Run the app: `cargo run`
+- add a `config/stats.txt` file containing the stats you want, or use the one provided as an example
+- add a file for each of your player in the `config/players` folder. This file specifies the name of the player, his name on Discord, and the experience of the player in each stat. Use `config/players/player1.json` as a reference.
+- the `config/config.json` file allows for some app configuration.
+- Run the app: `cargo run`. This requires Rust (developed using v1.64).
 
 ## TODO:
 

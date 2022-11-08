@@ -52,8 +52,9 @@ impl Player {
 }
 
 /// Parse and get the players from the "players" folder
-pub fn get_players() -> Result<Vec<Player>> {
-    let player_paths = read_dir("./players").context("You should have a 'players' directory")?;
+pub fn get_players(path: &str) -> Result<Vec<Player>> {
+    let player_paths =
+        read_dir(path).context("You should have a 'players' directory in the config folder")?;
 
     player_paths
         .map(|p| {
