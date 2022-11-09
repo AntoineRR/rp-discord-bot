@@ -3,7 +3,8 @@ use std::env;
 use std::process::exit;
 use std::sync::Arc;
 
-use rp_tool::commands::parser::parse;
+use rp_tool::commands::help::help;
+use rp_tool::commands::parser::{parse, ParsingError};
 use rp_tool::commands::ping::ping;
 use rp_tool::commands::roll::roll;
 use rp_tool::commands::Command;
@@ -28,15 +29,30 @@ impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
         let data = ctx.data.read().await;
         let state = data.get::<State>().unwrap().clone();
-        if let Ok(command) = parse(&msg.content) {
-            info!("Received '{command}' command from {}", &msg.author.name);
-            if let Err(e) = match command {
-                Command::Ping => ping(&ctx, &msg).await,
-                Command::Roll => roll(&ctx, &msg, state.lock().await.borrow_mut()).await,
-            } {
-                error!("Failed to execute {command} command: {e}");
-            } else {
-                info!("Executed {command} command successfully");
+        match parse(&msg.content) {
+            Ok(command) => {
+                info!("Received '{command}' command from {}", &msg.author.name);
+                if let Err(e) = match command {
+                    Command::Help => help(&ctx, &msg, "").await,
+                    Command::Ping => ping(&ctx, &msg).await,
+                    Command::Roll => roll(&ctx, &msg, state.lock().await.borrow_mut()).await,
+                } {
+                    error!("Failed to execute {command} command: {e}");
+                } else {
+                    info!("Executed {command} command successfully");
+                }
+            }
+            // Display help if we received an unknown command
+            Err(e) => {
+                if let Some(ParsingError::UnknownCommand) = e.downcast_ref::<ParsingError>() {
+                    help(
+                        &ctx,
+                        &msg,
+                        "Unknown command, here are the available commands",
+                    )
+                    .await
+                    .unwrap_or_else(|e| error!("Failed to display help: {e}"));
+                }
             }
         }
     }

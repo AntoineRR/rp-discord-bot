@@ -689,6 +689,7 @@ dependencies = [
  "serenity",
  "strum",
  "strum_macros",
+ "thiserror",
  "tokio",
  "tracing",
  "tracing-subscriber",

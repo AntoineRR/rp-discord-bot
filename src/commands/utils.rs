@@ -75,6 +75,22 @@ pub async fn send_yes_no_message(
         .context("Failed to write message")
 }
 
+/// Send a message referencing all the commands
+pub async fn send_help_message(
+    ctx: &serenity::prelude::Context,
+    channel_id: &ChannelId,
+    content: &str,
+) -> Result<Message> {
+    channel_id
+        .send_message(ctx, |m| m.content(content).embed(|e| e.title("HELP").fields(vec![
+            ("!help", "Display this help message", false),
+            ("!ping", "Ping the bot to check if it is still available", false),
+            ("!roll", "Open an interactive message to roll a button for a specific stat, will update the experience of the player if a player file is associated with the discord user", false)
+        ])))
+        .await
+        .context("Failed to write message")
+}
+
 /// Wait for an interaction on the given message and return it
 pub async fn wait_for_interaction(
     ctx: &serenity::prelude::Context,
