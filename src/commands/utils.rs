@@ -15,11 +15,11 @@ use crate::stats::Stat;
 use super::roll::RollResult;
 
 /// Build a button based on an id and display string
-pub fn button(id: &str, display_name: &str) -> CreateButton {
+pub fn button(id: &str, display_name: &str, style: ButtonStyle) -> CreateButton {
     let mut b = CreateButton::default();
     b.custom_id(id);
     b.label(display_name);
-    b.style(ButtonStyle::Primary);
+    b.style(style);
     b
 }
 
@@ -31,7 +31,11 @@ pub fn buttons_from_stats<'a>(
     stats.chunks(5).for_each(|chunk| {
         components.create_action_row(|row| {
             chunk.iter().for_each(|stat| {
-                row.add_button(button(&stat.id, &stat.display_name));
+                let style = match stat.sub_stats.is_empty() {
+                    true => ButtonStyle::Secondary,
+                    false => ButtonStyle::Success,
+                };
+                row.add_button(button(&stat.id, &stat.display_name, style));
             });
             row
         });
@@ -42,8 +46,8 @@ pub fn buttons_from_stats<'a>(
 /// Build a row with a yes and a no button
 pub fn yes_no_buttons(components: &mut CreateComponents) -> &mut CreateComponents {
     components.create_action_row(|row| {
-        row.add_button(button("yes", "Yes"));
-        row.add_button(button("no", "No"))
+        row.add_button(button("yes", "Yes", ButtonStyle::Primary));
+        row.add_button(button("no", "No", ButtonStyle::Primary))
     })
 }
 

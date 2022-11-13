@@ -8,18 +8,17 @@ Combat
     Arme longue
     Poudre noire
     Arme de siège
-    Combat à main
-    Force brute
+    Lutte
     Parade
-    Bouclier
 Physique
-    Réactivité
-    Célérité
-    Agilité
+    Force brute
     Endurance physique
     Résistance aux dommages physiques
     Résistance aux éléments
     Santé de fer
+    Réactivité
+    Célérité
+    Agilité
     Résistance aux attaques magiques
 Social
     Sang-froid
@@ -34,7 +33,6 @@ Social
     Economie
     Etiquette
     Religion
-    Manipulation des émotions
 Savoir faire
     Art Pictural
     Art Musical
@@ -46,41 +44,47 @@ Savoir faire
     Artisanat de la Terre
     Artisanat du Bois
     Artisanat du Tissu
+Survie
     Cuisine
     Médecine
     Gérilla
-    Navigation
-    Fouille/vol
     Galérien
-    Dressage
-Magie
-    Alchimie
-    Invocation
-    Enchantement
-    Pyromancie
-    Aquamentie
-    Fulgomancie
-    Caelimencie
-    Géomancie
-    Adamancie
-    Luxomancie
-    Noxomancie
-    Bénédiction
-    Malédiction
-    Résurrection
-    Nécromantie
-    Soins magiques
-    Psychokinésie
-    Métamorphose
-    Désenchantement
-    Envoûtement
-Autre
-    Inquisition
-    Folie
-    Prémonition
-    Contrôle des Créatures
-    Contrôle de la Flore
+    Navigation
     Botanique
     Bestiaire
+    Dressage
+Magie
+    Magie Elémentaire
+        Aquamentie
+        Fulgomancie
+        Caelimencie
+        Pyromancie
+        Géomancie
+        Adamancie
+    Magie Blanche
+        Luxomancie
+        Bénédiction
+        Désenchantement
+    Magie Noire
+        Noxomancie
+        Malédiction
+        Nécromantie
+    Résurrection
+    Soins magiques
+    Bouclier
+    Métamorphose
+    Contrôle de la Faune
+    Contrôle de la Flore
+    Envoûtement
+    Manipulation des émotions
+    Illusion
+    Télépathie
+    Prémonition
+    Psychokinésie
+    Enchantement
+    Invocation
+Autre
+    Alchimie
+    Vol
     Perception visuelle
     Perception aveugle
