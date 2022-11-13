@@ -38,8 +38,12 @@ async fn choose_stat<'a: 'async_recursion>(
     let interaction = wait_for_interaction(ctx, msg).await?;
 
     // Get the stat selected by the user
-    let stat_id = &interaction.data.custom_id;
-    let stat = stats.iter().find(|&s| &s.id == stat_id).unwrap().clone();
+    let res_id = &interaction.data.custom_id;
+    if res_id == "abort" {
+        finish_interaction(ctx, &interaction, "Command aborted").await?;
+        return Err("Aborted by user").map_err(anyhow::Error::msg);
+    }
+    let stat = stats.iter().find(|&s| &s.id == res_id).unwrap().clone();
     info!("Selected stat {}", stat.display_name);
 
     // If the stat has substats, we should let the user select one

@@ -41,6 +41,7 @@ pub fn buttons_from_stats<'a>(
         });
     });
     components
+        .create_action_row(|row| row.add_button(button("abort", "Abort", ButtonStyle::Danger)))
 }
 
 /// Build a row with a yes and a no button

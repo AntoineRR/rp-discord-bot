@@ -27,9 +27,9 @@ impl Stat {
     /// Create a Stat from a raw line of the file
     /// The raw input will be cleaned to be used as an id for the stat
     pub fn from(raw_line: &str, sub_stats: &[Stat]) -> Result<Self> {
-        if sub_stats.len() > 25 {
+        if sub_stats.len() > 20 {
             return Err(
-                "There shouldn't be more than 25 stats in one category, check your stats.txt file.",
+                "There shouldn't be more than 20 stats in one category, check your stats.txt file.",
             )
             .map_err(anyhow::Error::msg);
         }
