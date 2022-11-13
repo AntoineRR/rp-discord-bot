@@ -9,8 +9,8 @@ use tracing::{error, info, warn};
 
 use crate::{
     commands::utils::{display_result, update_interaction_with_stats, wait_for_interaction},
-    players::Player,
-    stats::Stat,
+    config::players::Player,
+    config::stat::Stat,
     Config, State,
 };
 

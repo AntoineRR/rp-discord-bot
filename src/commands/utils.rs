@@ -10,7 +10,7 @@ use serenity::{
     },
 };
 
-use crate::stats::Stat;
+use crate::config::stat::Stat;
 
 use super::roll::RollResult;
 

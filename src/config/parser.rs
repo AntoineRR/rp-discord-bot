@@ -2,7 +2,16 @@ use std::fs;
 
 use anyhow::Result;
 
-fn clean_input(c: char) -> char {
+pub trait TreeStructure {
+    fn get_children(&self) -> &[Self]
+    where
+        Self: Clone;
+    fn from_line(line: &str, children: &[Self]) -> Result<Self>
+    where
+        Self: Sized;
+}
+
+pub fn clean_input(c: char) -> char {
     let c = c.to_lowercase().next().unwrap();
     match c {
         'é' | 'è' | 'ê' | 'ë' => 'e',
@@ -12,33 +21,6 @@ fn clean_input(c: char) -> char {
         'œ' => 'e',
         ' ' | '-' | '/' => '_',
         c => c,
-    }
-}
-
-/// Represent a stat tree node
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Stat {
-    pub id: String,
-    pub display_name: String,
-    pub sub_stats: Vec<Stat>,
-}
-
-impl Stat {
-    /// Create a Stat from a raw line of the file
-    /// The raw input will be cleaned to be used as an id for the stat
-    pub fn from(raw_line: &str, sub_stats: &[Stat]) -> Result<Self> {
-        if sub_stats.len() > 20 {
-            return Err(
-                "There shouldn't be more than 20 stats in one category, check your stats.txt file.",
-            )
-            .map_err(anyhow::Error::msg);
-        }
-
-        Ok(Stat {
-            id: raw_line.trim().chars().map(clean_input).collect(),
-            display_name: raw_line.trim().to_string(),
-            sub_stats: sub_stats.to_vec(),
-        })
     }
 }
 
@@ -76,27 +58,25 @@ fn get_indent_level(line: &str) -> usize {
 }
 
 // Build a stat tree based on the stats as lines, by parsing the line's indentation
-fn build_stat_tree(lines: &[ParsedLine], index: usize) -> Result<Stat> {
+fn build_tree<T: TreeStructure>(lines: &[ParsedLine], index: usize) -> Result<T> {
     if index + 1 >= lines.len() {
-        return Stat::from(&lines[index].value, &[]);
+        return T::from_line(&lines[index].value, &[]);
     }
-    let mut children: Vec<Stat> = vec![];
+    let mut children: Vec<T> = vec![];
     let current_indent_level = lines[index].indent_level;
     let children_indent_level = current_indent_level + 4;
     for (idx, line) in lines[index + 1..].iter().enumerate() {
         match line.indent_level {
-            i if i == children_indent_level => {
-                children.push(build_stat_tree(lines, index + 1 + idx)?)
-            }
-            i if i < children_indent_level => return Stat::from(&lines[index].value, &children),
+            i if i == children_indent_level => children.push(build_tree(lines, index + 1 + idx)?),
+            i if i < children_indent_level => return T::from_line(&lines[index].value, &children),
             _ => (),
         }
     }
-    Stat::from(&lines[index].value, &children)
+    T::from_line(&lines[index].value, &children)
 }
 
 /// Get the stat tree from the stats.txt file
-pub fn get_stats(path: &str) -> Result<Vec<Stat>> {
+pub fn get_tree<T: TreeStructure + Clone>(path: &str) -> Result<Vec<T>> {
     let file_content = fs::read_to_string(path).expect("Could not read stats file");
     // A root node is needed to build the Stat tree
     let mut parsed_lines = vec![ParsedLine::root()];
@@ -108,14 +88,14 @@ pub fn get_stats(path: &str) -> Result<Vec<Stat>> {
             .collect(),
     );
     // Drop the root node by returning only its children
-    Ok(build_stat_tree(&parsed_lines, 0)?.sub_stats)
+    Ok(build_tree::<T>(&parsed_lines, 0)?.get_children().to_vec())
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::stats::Stat;
+    use crate::config::stat::Stat;
 
-    use super::{build_stat_tree, ParsedLine};
+    use super::{build_tree, ParsedLine, TreeStructure};
 
     fn assert_vec_eq<T: PartialEq>(vec1: Vec<T>, vec2: Vec<T>) {
         assert!(vec1.iter().zip(vec2).all(|(v1, v2)| *v1 == v2));
@@ -135,13 +115,13 @@ mod tests {
     #[test]
     fn parse_stats_no_indent() {
         let lines = ["Stat1", "Stat2", "Stat3"];
-        let result = build_stat_tree(&get_parsed_lines(&lines), 0)
+        let result = build_tree::<Stat>(&get_parsed_lines(&lines), 0)
             .unwrap()
             .sub_stats;
         let expected = vec![
-            Stat::from("Stat1", &[]).unwrap(),
-            Stat::from("Stat2", &[]).unwrap(),
-            Stat::from("Stat3", &[]).unwrap(),
+            Stat::from_line("Stat1", &[]).unwrap(),
+            Stat::from_line("Stat2", &[]).unwrap(),
+            Stat::from_line("Stat3", &[]).unwrap(),
         ];
         assert_vec_eq(result, expected);
     }
@@ -149,14 +129,14 @@ mod tests {
     #[test]
     fn parse_stats_one_level_indent() {
         let lines = ["Stat1", "    Stat2", "    Stat3"];
-        let result = build_stat_tree(&get_parsed_lines(&lines), 0)
+        let result = build_tree::<Stat>(&get_parsed_lines(&lines), 0)
             .unwrap()
             .sub_stats;
-        let expected = vec![Stat::from(
+        let expected = vec![Stat::from_line(
             "Stat1",
             &[
-                Stat::from("Stat2", &[]).unwrap(),
-                Stat::from("Stat3", &[]).unwrap(),
+                Stat::from_line("Stat2", &[]).unwrap(),
+                Stat::from_line("Stat3", &[]).unwrap(),
             ],
         )
         .unwrap()];
@@ -173,23 +153,23 @@ mod tests {
             "    Stat5",
             "    Stat6",
         ];
-        let result = build_stat_tree(&get_parsed_lines(&lines), 0)
+        let result = build_tree::<Stat>(&get_parsed_lines(&lines), 0)
             .unwrap()
             .sub_stats;
         let expected = vec![
-            Stat::from(
+            Stat::from_line(
                 "Stat1",
                 &[
-                    Stat::from("Stat2", &[]).unwrap(),
-                    Stat::from("Stat3", &[]).unwrap(),
+                    Stat::from_line("Stat2", &[]).unwrap(),
+                    Stat::from_line("Stat3", &[]).unwrap(),
                 ],
             )
             .unwrap(),
-            Stat::from(
+            Stat::from_line(
                 "Stat4",
                 &[
-                    Stat::from("Stat5", &[]).unwrap(),
-                    Stat::from("Stat6", &[]).unwrap(),
+                    Stat::from_line("Stat5", &[]).unwrap(),
+                    Stat::from_line("Stat6", &[]).unwrap(),
                 ],
             )
             .unwrap(),
@@ -211,28 +191,28 @@ mod tests {
             "    Stat9",
             "        Stat10",
         ];
-        let result = build_stat_tree(&get_parsed_lines(&lines), 0)
+        let result = build_tree::<Stat>(&get_parsed_lines(&lines), 0)
             .unwrap()
             .sub_stats;
         let expected = vec![
-            Stat::from(
+            Stat::from_line(
                 "Stat1",
-                &[Stat::from("Stat2", &[Stat::from("Stat3", &[]).unwrap()]).unwrap()],
+                &[Stat::from_line("Stat2", &[Stat::from_line("Stat3", &[]).unwrap()]).unwrap()],
             )
             .unwrap(),
-            Stat::from(
+            Stat::from_line(
                 "Stat4",
                 &[
-                    Stat::from(
+                    Stat::from_line(
                         "Stat5",
                         &[
-                            Stat::from("Stat6", &[]).unwrap(),
-                            Stat::from("Stat7", &[]).unwrap(),
+                            Stat::from_line("Stat6", &[]).unwrap(),
+                            Stat::from_line("Stat7", &[]).unwrap(),
                         ],
                     )
                     .unwrap(),
-                    Stat::from("Stat8", &[]).unwrap(),
-                    Stat::from("Stat9", &[Stat::from("Stat10", &[]).unwrap()]).unwrap(),
+                    Stat::from_line("Stat8", &[]).unwrap(),
+                    Stat::from_line("Stat9", &[Stat::from_line("Stat10", &[]).unwrap()]).unwrap(),
                 ],
             )
             .unwrap(),

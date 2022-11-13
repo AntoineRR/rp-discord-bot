@@ -1,0 +1,102 @@
+Lame
+    Lame courte
+    Lame longue
+Arme lourde
+    Hache
+    Masse
+Arme technique
+    Arme de jet
+    Arme de trait
+    Arme longue
+Arme explosive
+    Poudre noire
+    Arme de siège
+Bourrin
+    Lutte
+    Force brute
+Blindage
+    Endurance physique
+    Résistance aux dommages physiques
+    Résistance aux éléments
+    Santé de fer
+Stoïcisme
+    Résistance aux attaques magiques
+    Sang-froid
+    Coeur de pierre
+Persuasion
+    Attendrissement
+    Charme
+    Aguichage
+    Intimidation
+Conviction
+    Rhétorique
+    Négoce
+Education
+    Géopolitique
+    Economie
+    Etiquette
+    Religion
+Art
+    Art Pictural
+    Art Musical
+    Art Théâtral
+    Art Littéraire
+Artisanat
+    Artisanat du Cuir
+    Artisanat du Métal
+    Artisanat de la Terre
+    Artisanat du Bois
+    Artisanat de la Pierre
+    Artisanat du Tissu
+Tambouille
+    Cuisine
+    Médecine
+    Alchimie
+Ranger
+    Guérilla
+    Galérien
+    Botanique
+    Bestiaire
+    Dressage
+    Navigation
+Magie Céleste
+    Aquamancie
+    Fulgomancie
+    Caelimencie
+Magie Tellurique
+    Pyromancie
+    Géomancie
+    Adamancie
+Magie Blanche
+    Luxomancie
+    Bénédiction
+    Désenchantement
+Magie Bleue
+    Résurrection
+    Soins magiques
+    Bouclier
+Magie verte
+    Contrôle de la Faune
+    Contrôle de la Flore
+    Métamorphose
+Magie Mauve
+    Prémonition
+    Télépathie
+    Psychokinésie
+Magie Rouge
+    Envoûtement
+    Manipulation des émotions
+    Illusion
+Magie noire
+    Noxomancie
+    Malédiction
+    Nécromantie
+Parade
+Réactivité
+Célérité
+Agilité
+Vol
+Perception visuelle
+Perception aveugle
+Invocation
+Enchantement

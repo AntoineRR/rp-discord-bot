@@ -2,34 +2,25 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
-use players::{get_players, Player};
-use serde::{Deserialize, Serialize};
+use config::affinity::Affinity;
+use config::players::{get_players, Player};
+use config::stat::Stat;
+use config::Config;
 use serenity::prelude::{Mutex, TypeMapKey};
-use stats::{get_stats, Stat};
 use tracing::info;
 
+use crate::config::parser::get_tree;
+
 pub mod commands;
-mod players;
-mod stats;
-
-/// Corresponds to the customizable config file that can be modified by the user
-#[derive(Debug, Serialize, Deserialize)]
-struct Config {
-    experience_earned_after_success: i32,
-    experience_earned_after_failure: i32,
-}
-
-impl Config {
-    pub fn from(path: &str) -> Self {
-        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
-    }
-}
+mod config;
 
 /// Holds the configuration, list of stats, and player infos at all time
 #[derive(Debug)]
 pub struct State {
-    config: Config,       // A global config
-    stats: Vec<Stat>,     // The stat tree that will be used to select a stat
+    config: Config,   // A global config
+    stats: Vec<Stat>, // The stat tree that will be used to select a stat
+    #[allow(dead_code)]
+    affinities: Vec<Affinity>, // The available affinities groups
     players: Vec<Player>, // The player infos
 }
 
@@ -43,7 +34,8 @@ impl State {
         info!("Loading config from {}", config_folder);
         Ok(State {
             config: Config::from(&format!("{}/config.json", config_folder)),
-            stats: get_stats(&format!("{}/stats.txt", config_folder))?,
+            stats: get_tree(&format!("{}/stats.txt", config_folder))?,
+            affinities: get_tree(&format!("{}/affinities.txt", config_folder))?,
             players: get_players(&format!("{}/players", config_folder))?,
         })
     }
