@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use anyhow::Result;
 use async_recursion::async_recursion;
 use rand::{rngs::StdRng, Rng};
@@ -16,8 +18,37 @@ use crate::{
 
 use super::utils::{finish_interaction, send_choose_stats_message, send_yes_no_message};
 
+pub struct StatType {
+    is_talent: bool,
+    is_major_affinity: bool,
+    is_minor_affinity: bool,
+}
+
+impl Display for StatType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut types = vec![];
+        if self.is_talent {
+            types.push("Talent");
+        }
+        if self.is_major_affinity {
+            types.push("Major affinity");
+        }
+        if self.is_minor_affinity {
+            types.push("Minor affinity");
+        }
+        write!(f, "{}", types.join(" + "))
+    }
+}
+
+impl StatType {
+    pub fn is_special(&self) -> bool {
+        self.is_talent || self.is_major_affinity || self.is_minor_affinity
+    }
+}
+
 pub struct RollResult {
     pub stat: String,
+    pub stat_type: StatType,
     pub player_name: Option<String>,
     pub roll: i32,
     pub threshold: Option<i32>,
@@ -105,8 +136,14 @@ async fn choose_stat<'a: 'async_recursion>(
                     error!("Something went wrong when updating the player experience: {e}")
                 }
 
+                let stat_type = StatType {
+                    is_talent,
+                    is_major_affinity,
+                    is_minor_affinity,
+                };
                 RollResult {
                     stat: stat.display_name.to_string(),
+                    stat_type,
                     player_name: Some(p.name),
                     roll,
                     threshold: Some(threshold),
@@ -115,6 +152,11 @@ async fn choose_stat<'a: 'async_recursion>(
             }
             None => RollResult {
                 stat: stat.display_name.to_string(),
+                stat_type: StatType {
+                    is_talent: false,
+                    is_major_affinity: false,
+                    is_minor_affinity: false,
+                },
                 player_name: None,
                 roll,
                 threshold: None,

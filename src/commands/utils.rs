@@ -152,7 +152,13 @@ pub async fn display_result(
         None => "",
     };
     let description = match &roll_result.player_name {
-        Some(n) => format!("**{n}** / *{}*", &roll_result.stat),
+        Some(n) => {
+            let stat_type = match roll_result.stat_type.is_special() {
+                true => format!("\n{}", roll_result.stat_type),
+                false => "".to_owned(),
+            };
+            format!("**{n}** / *{}*{}", &roll_result.stat, stat_type)
+        }
         None => format!("*{}*", &roll_result.stat),
     };
     let mut fields = vec![("Roll", format!("*{}*", &roll_result.roll), true)];
