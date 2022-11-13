@@ -10,7 +10,7 @@ use tracing::{error, info, warn};
 use crate::{
     commands::utils::{display_result, update_interaction_with_stats, wait_for_interaction},
     config::players::Player,
-    config::stat::Stat,
+    config::{affinity::Affinity, stat::Stat},
     Config, State,
 };
 
@@ -31,6 +31,7 @@ async fn choose_stat<'a: 'async_recursion>(
     ctx: &Context,
     msg: &Message,
     player: Option<Player>,
+    affinities: &[Affinity],
     stats: &[Stat],
     config: &Config,
 ) -> Result<()> {
@@ -59,7 +60,7 @@ async fn choose_stat<'a: 'async_recursion>(
         .await?;
 
         // Recursion to check the stat chosen by the user
-        choose_stat(ctx, msg, player, &stat.sub_stats, config).await?;
+        choose_stat(ctx, msg, player, affinities, &stat.sub_stats, config).await?;
     }
     // The stat has no substats, time to end the recursion
     else {
@@ -74,7 +75,24 @@ async fn choose_stat<'a: 'async_recursion>(
                 // Find the limit for a success based on the experience in this stat
                 // TODO: allow customization of the function?
                 let player_experience = *p.stats.get(&stat.display_name).unwrap();
-                let threshold = (100.0 - 99.0 * f64::exp(-player_experience as f64 / 334.6)) as i32;
+                let is_talent = p.talent.contains(&stat.display_name);
+                let is_major_affinity = p.affinities.is_major(&stat.display_name, affinities)?;
+                let is_minor_affinity = p.affinities.is_minor(&stat.display_name, affinities)?;
+
+                // Talent and affinities decrease the coefficient, meaning the player has a lower threshold to success in his roll
+                let mut coefficient = 334.6;
+                if is_talent {
+                    coefficient *= 1.0 - config.talent_increase_percentage;
+                }
+                if is_major_affinity {
+                    coefficient *= 1.0 - config.major_affinity_increase_percentage;
+                }
+                if is_minor_affinity {
+                    coefficient *= 1.0 - config.minor_affinity_increase_percentage;
+                }
+                let threshold =
+                    (100.0 - 99.0 * f64::exp(-player_experience as f64 / coefficient)) as i32;
+
                 let (successful, experience_earned) = if roll > threshold {
                     info!("Player {} failed the check: {roll}/{threshold}", p.name);
                     (false, config.experience_earned_after_failure)
@@ -166,7 +184,15 @@ pub async fn roll(ctx: &Context, msg: &Message, state: &mut State) -> Result<()>
     .await?;
 
     // Guide the user through the stat tree to choose a stat
-    choose_stat(ctx, &m, player, &state.stats, &state.config).await?;
+    choose_stat(
+        ctx,
+        &m,
+        player,
+        &state.affinities,
+        &state.stats,
+        &state.config,
+    )
+    .await?;
 
     Ok(())
 }

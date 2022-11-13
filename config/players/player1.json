@@ -1,4 +1,13 @@
 {
+  "affinities": {
+    "major": [
+      "Blindage"
+    ],
+    "minor": [
+      "Tambouille",
+      "Art"
+    ]
+  },
   "discord_name": "Obelix",
   "name": "Asterix",
   "stats": {
@@ -82,5 +91,8 @@
     "Sang-froid": 5,
     "Santé de fer": 78,
     "Soins magiques": 20
-  }
+  },
+  "talent": [
+    "Hache"
+  ]
 }

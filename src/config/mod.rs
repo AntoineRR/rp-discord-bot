@@ -10,6 +10,9 @@ pub mod stat;
 pub struct Config {
     pub experience_earned_after_success: i32,
     pub experience_earned_after_failure: i32,
+    pub talent_increase_percentage: f64,
+    pub major_affinity_increase_percentage: f64,
+    pub minor_affinity_increase_percentage: f64,
 }
 
 impl Config {

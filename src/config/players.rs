@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs::read_dir};
 
+use super::affinity::Affinities;
+
 // https://stackoverflow.com/questions/67789198/how-can-i-sort-fields-in-alphabetic-order-when-serializing-with-serde
 // values get sorted because serde_json uses a BTreeMap internally
 fn sort_alphabetically<T: Serialize, S: serde::Serializer>(
@@ -24,6 +26,8 @@ pub struct Player {
     pub name: String,                // The name of the player in the game
     pub discord_name: String,        // The discord pseudo of the player
     pub stats: HashMap<String, i32>, // The stats of the player along with his experience for each of them
+    pub affinities: Affinities,      // The affinities of the player
+    pub talent: Vec<String>,         // The talents of the player (+20% on exp)
 }
 
 impl Player {
