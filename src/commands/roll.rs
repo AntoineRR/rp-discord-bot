@@ -2,7 +2,9 @@ use std::fmt::Display;
 
 use anyhow::Result;
 use async_recursion::async_recursion;
-use rand::{rngs::StdRng, Rng};
+use rand::rngs::StdRng;
+use rand::Rng;
+use rand_distr::{Distribution, Normal};
 use serenity::{
     model::prelude::{ChannelId, Message},
     prelude::Context,
@@ -12,7 +14,7 @@ use tracing::{error, info, warn};
 use crate::{
     commands::utils::{display_result, update_interaction_with_stats, wait_for_interaction},
     config::players::Player,
-    config::{affinity::Affinity, stat::Stat},
+    config::{affinity::Affinity, stat::Stat, StatisticLaw},
     Config, State,
 };
 
@@ -96,8 +98,16 @@ async fn choose_stat<'a: 'async_recursion>(
     // The stat has no substats, time to end the recursion
     else {
         // Roll a dice
-        let mut rng: StdRng = rand::SeedableRng::from_entropy();
-        let roll = rng.gen_range(1..101);
+        let roll = match config.roll_command_statistic_law {
+            StatisticLaw::Uniform => {
+                let mut rng: StdRng = rand::SeedableRng::from_entropy();
+                rng.gen_range(1..101)
+            }
+            StatisticLaw::Normal(mean, std_dev) => Normal::new(mean, std_dev)
+                .unwrap()
+                .sample(&mut rand::thread_rng())
+                .clamp(1.0, 100.0) as i32,
+        };
         info!("Rolled a {roll} for stat {}", stat.display_name);
 
         // Prepare info for the final message

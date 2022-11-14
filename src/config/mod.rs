@@ -5,6 +5,13 @@ pub mod parser;
 pub mod players;
 pub mod stat;
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "law", content = "parameters")]
+pub enum StatisticLaw {
+    Uniform,
+    Normal(f64, f64),
+}
+
 /// Corresponds to the customizable config file that can be modified by the user
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -13,6 +20,7 @@ pub struct Config {
     pub talent_increase_percentage: f64,
     pub major_affinity_increase_percentage: f64,
     pub minor_affinity_increase_percentage: f64,
+    pub roll_command_statistic_law: StatisticLaw,
 }
 
 impl Config {

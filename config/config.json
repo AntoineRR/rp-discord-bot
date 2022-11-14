@@ -3,5 +3,6 @@
     "experience_earned_after_failure": 1,
     "talent_increase_percentage": 0.2,
     "major_affinity_increase_percentage": 0.1,
-    "minor_affinity_increase_percentage": 0.05
+    "minor_affinity_increase_percentage": 0.05,
+    "roll_command_statistic_law": {"law": "Uniform"}
 }
