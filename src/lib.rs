@@ -18,8 +18,8 @@ mod config;
 /// Holds the configuration, list of stats, and player infos at all time
 #[derive(Debug)]
 pub struct State {
-    config: Config,   // A global config
-    stats: Vec<Stat>, // The stat tree that will be used to select a stat
+    pub config: Config, // A global config
+    stats: Vec<Stat>,   // The stat tree that will be used to select a stat
     #[allow(dead_code)]
     affinities: Vec<Affinity>, // The available affinities groups
     players: HashMap<String, String>, // The mapping of a discord name with a player file name

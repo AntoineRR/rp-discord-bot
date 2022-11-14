@@ -35,7 +35,6 @@ DISCORD_TOKEN=<your-token>
 
 - Add a shortcut for dice rolls (eg: !roll agility)
 - Add a command to view the xp / roll threshold for a stat
-- Disable the auto help message when a wrong command is entered in the config
 - Other players shouldn't see the stat choices
 - The GM should be able to choose a specific player file
 - The GM should be able to hide his rolls from the player

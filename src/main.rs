@@ -44,14 +44,21 @@ impl EventHandler for Handler {
             }
             // Display help if we received an unknown command
             Err(e) => {
-                if let Some(ParsingError::UnknownCommand) = e.downcast_ref::<ParsingError>() {
-                    help(
-                        &ctx,
-                        &msg,
-                        "Unknown command, here are the available commands",
-                    )
+                if state
+                    .lock()
                     .await
-                    .unwrap_or_else(|e| error!("Failed to display help: {e}"));
+                    .config
+                    .send_help_message_when_unknown_command
+                {
+                    if let Some(ParsingError::UnknownCommand) = e.downcast_ref::<ParsingError>() {
+                        help(
+                            &ctx,
+                            &msg,
+                            "Unknown command, here are the available commands",
+                        )
+                        .await
+                        .unwrap_or_else(|e| error!("Failed to display help: {e}"));
+                    }
                 }
             }
         }

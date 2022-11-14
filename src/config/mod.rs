@@ -21,6 +21,7 @@ pub struct Config {
     pub major_affinity_increase_percentage: f64,
     pub minor_affinity_increase_percentage: f64,
     pub roll_command_statistic_law: StatisticLaw,
+    pub send_help_message_when_unknown_command: bool,
 }
 
 impl Config {
