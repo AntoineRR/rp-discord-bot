@@ -63,7 +63,7 @@ pub struct RollResult {
 async fn choose_stat<'a: 'async_recursion>(
     ctx: &Context,
     msg: &Message,
-    player: Option<Player>,
+    player: Option<&'a str>,
     affinities: &[Affinity],
     stats: &[Stat],
     config: &Config,
@@ -112,7 +112,8 @@ async fn choose_stat<'a: 'async_recursion>(
 
         // Prepare info for the final message
         let roll_result = match player {
-            Some(mut p) => {
+            Some(p_path) => {
+                let mut p = Player::from(p_path)?;
                 // Find the limit for a success based on the experience in this stat
                 // TODO: allow customization of the function?
                 let player_experience = *p.stats.get(&stat.display_name).unwrap();
@@ -212,11 +213,7 @@ pub async fn roll(ctx: &Context, msg: &Message, state: &mut State) -> Result<()>
 
     // Getting info for the player from his discord name
     info!("Retrieving player info for {discord_name}");
-    let player = state
-        .players
-        .iter_mut()
-        .find(|p| &p.discord_name == discord_name)
-        .cloned();
+    let player = state.players.get(discord_name).map(|x| &**x);
     if player.is_none() {
         warn!("Could not find info for player {discord_name}");
         proceed_without_player_stats(ctx, &channel_id, discord_name).await?;

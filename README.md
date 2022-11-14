@@ -40,4 +40,3 @@ DISCORD_TOKEN=<your-token>
 - The GM should be able to choose a specific player file
 - The GM should be able to hide his rolls from the player
 - Add a return button to go back to the previous stat family
-- Allow to choose a normal statistic law for the dice roll :'(

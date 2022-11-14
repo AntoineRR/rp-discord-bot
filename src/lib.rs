@@ -1,9 +1,10 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
 
 use config::affinity::Affinity;
-use config::players::{get_players, Player};
+use config::players::get_players;
 use config::stat::Stat;
 use config::Config;
 use serenity::prelude::{Mutex, TypeMapKey};
@@ -21,7 +22,7 @@ pub struct State {
     stats: Vec<Stat>, // The stat tree that will be used to select a stat
     #[allow(dead_code)]
     affinities: Vec<Affinity>, // The available affinities groups
-    players: Vec<Player>, // The player infos
+    players: HashMap<String, String>, // The mapping of a discord name with a player file name
 }
 
 impl TypeMapKey for State {

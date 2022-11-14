@@ -56,15 +56,18 @@ impl Player {
 }
 
 /// Parse and get the players from the "players" folder
-pub fn get_players(path: &str) -> Result<Vec<Player>> {
+pub fn get_players(path: &str) -> Result<HashMap<String, String>> {
     let player_paths =
         read_dir(path).context("You should have a 'players' directory in the config folder")?;
 
-    player_paths
+    Ok(player_paths
         .map(|p| {
             let path = p.as_ref().unwrap().path();
             let path_str = path.as_os_str().to_str().unwrap();
             Player::from(path_str)
         })
-        .collect()
+        .collect::<Result<Vec<Player>>>()?
+        .iter()
+        .map(|p| (p.discord_name.to_string(), p.path.to_string()))
+        .collect())
 }
