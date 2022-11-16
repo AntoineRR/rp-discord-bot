@@ -1,9 +1,33 @@
-use anyhow::Result;
-use serenity::{model::prelude::Message, prelude::Context};
+use anyhow::{Context, Result};
+use async_trait::async_trait;
+use serenity::{
+    builder::CreateApplicationCommand,
+    model::prelude::interaction::application_command::ApplicationCommandInteraction,
+};
 
-/// Used for checking the bot is up and running
-/// The bot will only answer with "pong!"
-pub async fn ping(ctx: &Context, msg: &Message) -> Result<()> {
-    msg.channel_id.say(&ctx.http, "pong!").await?;
-    Ok(())
+use crate::State;
+
+use super::Command;
+
+pub struct Ping;
+
+#[async_trait]
+impl Command for Ping {
+    async fn run(
+        ctx: &serenity::prelude::Context,
+        command: &ApplicationCommandInteraction,
+        _state: &State,
+    ) -> Result<()> {
+        command
+            .create_interaction_response(ctx, |c| {
+                c.interaction_response_data(|m| m.content("Pong!"))
+            })
+            .await
+            .context("Failed to write message")
+    }
+    fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+        command
+            .name("ping")
+            .description("Ping the bot to check if it is still available")
+    }
 }

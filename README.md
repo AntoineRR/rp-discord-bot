@@ -33,9 +33,8 @@ DISCORD_TOKEN=<your-token>
 
 ## TODO:
 
-- Add a shortcut for dice rolls (eg: !roll agility)
+- Add a shortcut for dice rolls (eg: /roll agility)
 - Add a command to view the xp / roll threshold for a stat
-- Other players shouldn't see the stat choices
 - The GM should be able to choose a specific player file
 - The GM should be able to hide his rolls from the player
 - Add a return button to go back to the previous stat family

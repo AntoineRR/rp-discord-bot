@@ -1,24 +1,31 @@
-use std::fmt::Display;
+use std::{fmt::Display, sync::Arc};
 
 use anyhow::Result;
 use async_recursion::async_recursion;
+use async_trait::async_trait;
 use rand::rngs::StdRng;
 use rand::Rng;
 use rand_distr::{Distribution, Normal};
 use serenity::{
-    model::prelude::{ChannelId, Message},
-    prelude::Context,
+    builder::CreateApplicationCommand,
+    model::prelude::interaction::{
+        application_command::ApplicationCommandInteraction,
+        message_component::MessageComponentInteraction,
+    },
 };
 use tracing::{error, info, warn};
 
 use crate::{
-    commands::utils::{display_result, update_interaction_with_stats, wait_for_interaction},
+    commands::utils::{display_result, update_choose_stats_message},
     config::players::Player,
     config::{affinity::Affinity, stat::Stat, StatisticLaw},
     Config, State,
 };
 
-use super::utils::{finish_interaction, send_choose_stats_message, send_yes_no_message};
+use super::{
+    utils::{finish_interaction, send_choose_stats_message, send_yes_no_message},
+    Command,
+};
 
 pub struct StatType {
     is_talent: bool,
@@ -61,39 +68,36 @@ pub struct RollResult {
 /// Handle the recursion needed to go through the stat tree
 #[async_recursion]
 async fn choose_stat<'a: 'async_recursion>(
-    ctx: &Context,
-    msg: &Message,
+    ctx: &serenity::prelude::Context,
+    interaction: &MessageComponentInteraction,
     player: Option<&'a str>,
     affinities: &[Affinity],
     stats: &[Stat],
     config: &Config,
 ) -> Result<()> {
-    // Wait for a new interaction
-    let interaction = wait_for_interaction(ctx, msg).await?;
+    let res_id = interaction.data.custom_id.to_string();
 
     // Get the stat selected by the user
-    let res_id = &interaction.data.custom_id;
     if res_id == "abort" {
-        finish_interaction(ctx, &interaction, "Command aborted").await?;
+        finish_interaction(ctx, interaction, "Command aborted").await?;
         return Err("Aborted by user").map_err(anyhow::Error::msg);
     }
-    let stat = stats.iter().find(|&s| &s.id == res_id).unwrap().clone();
+    let stat = stats.iter().find(|&s| s.id == res_id).unwrap().clone();
     info!("Selected stat {}", stat.display_name);
 
     // If the stat has substats, we should let the user select one
     if !stat.sub_stats.is_empty() {
-        // Update the message to display the substats
-        info!("Asking user to choose a stat");
-        update_interaction_with_stats(
+        // Recursion to check the stat chosen by the user
+        let interaction = update_choose_stats_message(ctx, interaction, &stat.sub_stats).await?;
+        choose_stat(
             ctx,
             &interaction,
-            "Choose your stat / stat family",
+            player,
+            affinities,
             &stat.sub_stats,
+            config,
         )
         .await?;
-
-        // Recursion to check the stat chosen by the user
-        choose_stat(ctx, msg, player, affinities, &stat.sub_stats, config).await?;
     }
     // The stat has no substats, time to end the recursion
     else {
@@ -176,66 +180,58 @@ async fn choose_stat<'a: 'async_recursion>(
         };
 
         // Update the message to display the result
-        display_result(ctx, &interaction, &roll_result).await?;
+        display_result(ctx, interaction, &roll_result).await?;
     }
     Ok(())
 }
 
 async fn proceed_without_player_stats(
-    ctx: &Context,
-    channel_id: &ChannelId,
+    ctx: &serenity::prelude::Context,
+    command: &ApplicationCommandInteraction,
     discord_name: &str,
-) -> Result<()> {
-    let msg = send_yes_no_message(
+) -> Result<Arc<MessageComponentInteraction>> {
+    let interaction = send_yes_no_message(
         ctx,
-        channel_id,
+        command,
         &format!("No player stats found for player {discord_name}.\nDo you still want to proceed?"),
     )
-    .await?;
+    .await
+    .unwrap();
 
-    let interaction = wait_for_interaction(ctx, &msg).await?;
-
-    let answer = &interaction.data.custom_id;
-    if answer == "no" {
+    if &interaction.data.custom_id == "yes" {
+        Ok(interaction)
+    } else {
         finish_interaction(ctx, &interaction, "Command aborted").await?;
         Err("Aborted by user").map_err(anyhow::Error::msg)
-    } else {
-        finish_interaction(ctx, &interaction, "Stat experience will not be updated").await?;
-        Ok(())
     }
 }
 
 /// Roll a dice for the stat you choose
 /// The dice follows a uniform distribution
-pub async fn roll(ctx: &Context, msg: &Message, state: &mut State) -> Result<()> {
-    let channel_id = msg.channel_id;
-    let discord_name = &msg.author.name;
+pub async fn roll(
+    ctx: &serenity::prelude::Context,
+    command: &ApplicationCommandInteraction,
+    state: &State,
+) -> Result<()> {
+    let discord_name = &command.user.name;
 
     // Getting info for the player from his discord name
     info!("Retrieving player info for {discord_name}");
     let player = state.players.get(discord_name).map(|x| &**x);
-    if player.is_none() {
+    let interaction = if player.is_none() {
         warn!("Could not find info for player {discord_name}");
-        proceed_without_player_stats(ctx, &channel_id, discord_name).await?;
+        let int = proceed_without_player_stats(ctx, command, discord_name).await?;
         info!("Proceeding without info");
+        update_choose_stats_message(ctx, &int, &state.stats).await?
     } else {
         info!("Successfully retrieved player info for {discord_name}");
-    }
-
-    // Create the initial message that is going to be updated based on the user's choices
-    info!("Asking user to choose a stat");
-    let m = send_choose_stats_message(
-        ctx,
-        &channel_id,
-        "Choose your stat / stat family",
-        &state.stats,
-    )
-    .await?;
+        send_choose_stats_message(ctx, command, &state.stats).await?
+    };
 
     // Guide the user through the stat tree to choose a stat
     choose_stat(
         ctx,
-        &m,
+        &interaction,
         player,
         &state.affinities,
         &state.stats,
@@ -244,4 +240,20 @@ pub async fn roll(ctx: &Context, msg: &Message, state: &mut State) -> Result<()>
     .await?;
 
     Ok(())
+}
+
+pub struct Roll;
+
+#[async_trait]
+impl Command for Roll {
+    async fn run(
+        ctx: &serenity::prelude::Context,
+        command: &ApplicationCommandInteraction,
+        state: &State,
+    ) -> Result<()> {
+        roll(ctx, command, state).await
+    }
+    fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
+        command.name("roll").description("Roll the dice!")
+    }
 }

@@ -47,7 +47,7 @@ Savoir faire
 Survie
     Cuisine
     Médecine
-    Gérilla
+    Guérilla
     Galérien
     Navigation
     Botanique
@@ -55,9 +55,9 @@ Survie
     Dressage
 Magie
     Magie Elémentaire
-        Aquamentie
+        Aquamancie
         Fulgomancie
-        Caelimencie
+        Caelimancie
         Pyromancie
         Géomancie
         Adamancie
@@ -68,7 +68,7 @@ Magie
     Magie Noire
         Noxomancie
         Malédiction
-        Nécromantie
+        Nécromancie
     Résurrection
     Soins magiques
     Bouclier

@@ -62,7 +62,7 @@ Ranger
 Magie Céleste
     Aquamancie
     Fulgomancie
-    Caelimencie
+    Caelimancie
 Magie Tellurique
     Pyromancie
     Géomancie
@@ -90,7 +90,7 @@ Magie Rouge
 Magie noire
     Noxomancie
     Malédiction
-    Nécromantie
+    Nécromancie
 Parade
 Réactivité
 Célérité

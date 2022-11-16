@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use anyhow::Result;
 
@@ -7,7 +6,7 @@ use config::affinity::Affinity;
 use config::players::get_players;
 use config::stat::Stat;
 use config::Config;
-use serenity::prelude::{Mutex, TypeMapKey};
+use serenity::prelude::{RwLock, TypeMapKey};
 use tracing::info;
 
 use crate::config::parser::get_tree;
@@ -26,7 +25,7 @@ pub struct State {
 }
 
 impl TypeMapKey for State {
-    type Value = Arc<Mutex<Self>>;
+    type Value = RwLock<Self>;
 }
 
 impl State {

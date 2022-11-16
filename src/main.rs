@@ -1,17 +1,14 @@
-use std::borrow::BorrowMut;
+use std::borrow::Borrow;
 use std::env;
 use std::process::exit;
-use std::sync::Arc;
 
-use rp_tool::commands::help::help;
-use rp_tool::commands::parser::{parse, ParsingError};
-use rp_tool::commands::ping::ping;
-use rp_tool::commands::roll::roll;
+use rp_tool::commands;
 use rp_tool::commands::Command;
 use rp_tool::State;
 use serenity::client::{Context, EventHandler};
-use serenity::model::prelude::{Message, Ready};
-use serenity::prelude::{GatewayIntents, Mutex};
+use serenity::model::prelude::interaction::Interaction;
+use serenity::model::prelude::Ready;
+use serenity::prelude::{GatewayIntents, RwLock};
 use serenity::{async_trait, Client};
 use tracing::{error, info};
 
@@ -21,45 +18,51 @@ struct Handler;
 impl EventHandler for Handler {
     /// Handler for the `ready` event
     /// Called when the bot joins the server
-    async fn ready(&self, _: Context, ready: Ready) {
+    async fn ready(&self, ctx: Context, ready: Ready) {
+        for command in [
+            commands::ping::Ping::register,
+            commands::help::Help::register,
+            commands::roll::Roll::register,
+        ] {
+            if let Err(e) =
+                serenity::model::application::command::Command::create_global_application_command(
+                    &ctx.http,
+                    |c| command(c),
+                )
+                .await
+            {
+                error!("Could not register slash commands: {e}");
+            }
+        }
+
         info!("{} is connected!", ready.user.name);
     }
 
-    /// Handler for the `message` event
-    async fn message(&self, ctx: Context, msg: Message) {
-        let data = ctx.data.read().await;
-        let state = data.get::<State>().unwrap().clone();
-        match parse(&msg.content) {
-            Ok(command) => {
-                info!("Received '{command}' command from {}", &msg.author.name);
-                if let Err(e) = match command {
-                    Command::Help => help(&ctx, &msg, "").await,
-                    Command::Ping => ping(&ctx, &msg).await,
-                    Command::Roll => roll(&ctx, &msg, state.lock().await.borrow_mut()).await,
-                } {
-                    error!("Failed to execute {command} command: {e}");
-                } else {
-                    info!("Executed {command} command successfully");
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::ApplicationCommand(command) = interaction {
+            let data = ctx.data.read().await;
+            let state = data.get::<State>().unwrap();
+            info!(
+                "Received command interaction: {:#?}",
+                command.data.name.as_str()
+            );
+
+            let command_name = command.data.name.as_str();
+            let result = match command_name {
+                "help" => {
+                    commands::help::Help::run(&ctx, &command, state.read().await.borrow()).await
                 }
-            }
-            // Display help if we received an unknown command
-            Err(e) => {
-                if state
-                    .lock()
-                    .await
-                    .config
-                    .send_help_message_when_unknown_command
-                {
-                    if let Some(ParsingError::UnknownCommand) = e.downcast_ref::<ParsingError>() {
-                        help(
-                            &ctx,
-                            &msg,
-                            "Unknown command, here are the available commands",
-                        )
-                        .await
-                        .unwrap_or_else(|e| error!("Failed to display help: {e}"));
-                    }
+                "ping" => {
+                    commands::ping::Ping::run(&ctx, &command, state.read().await.borrow()).await
                 }
+                "roll" => {
+                    commands::roll::Roll::run(&ctx, &command, state.read().await.borrow()).await
+                }
+                _ => Err("Unimplemented command").map_err(anyhow::Error::msg),
+            };
+            match result {
+                Ok(()) => info!("Executed {command_name} command successfully"),
+                Err(e) => error!("Failed to execute {command_name} command: {e}"),
             }
         }
     }
@@ -111,7 +114,7 @@ async fn main() {
     // Wrapped in a block to close the write lock before starting the client
     {
         let mut data = client.data.write().await;
-        data.insert::<State>(Arc::new(Mutex::new(state)));
+        data.insert::<State>(RwLock::new(state));
     }
     // Finally, start a single shard, and start listening to events.
     if let Err(err) = client.start().await {

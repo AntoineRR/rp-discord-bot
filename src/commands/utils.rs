@@ -5,10 +5,13 @@ use serenity::{
     builder::{CreateButton, CreateComponents},
     model::prelude::{
         component::ButtonStyle,
-        interaction::{message_component::MessageComponentInteraction, InteractionResponseType},
-        ChannelId, Message,
+        interaction::{
+            application_command::ApplicationCommandInteraction,
+            message_component::MessageComponentInteraction, InteractionResponseType,
+        },
     },
 };
+use tracing::info;
 
 use crate::config::stat::Stat;
 
@@ -55,75 +58,77 @@ pub fn yes_no_buttons(components: &mut CreateComponents) -> &mut CreateComponent
 /// Send a message asking to choose between the given stats
 pub async fn send_choose_stats_message(
     ctx: &serenity::prelude::Context,
-    channel_id: &ChannelId,
-    content: &str,
+    command: &ApplicationCommandInteraction,
     stats: &[Stat],
-) -> Result<Message> {
-    channel_id
-        .send_message(&ctx, |m| {
-            m.content(content)
-                .components(|c| buttons_from_stats(c, stats))
+) -> Result<Arc<MessageComponentInteraction>> {
+    info!("Asking user to choose a stat");
+    command
+        .create_interaction_response(ctx, |c| {
+            c.interaction_response_data(|m| {
+                m.ephemeral(true)
+                    .content("Choose your stat / stat family")
+                    .components(|c| buttons_from_stats(c, stats))
+            })
         })
+        .await?;
+    command
+        .get_interaction_response(ctx)
+        .await?
+        .await_component_interaction(ctx)
+        .timeout(Duration::from_secs(3 * 60))
         .await
-        .context("Failed to write message")
+        .context("Interaction failed")
+}
+
+/// Send a message asking to choose between the given stats
+pub async fn update_choose_stats_message(
+    ctx: &serenity::prelude::Context,
+    interaction: &MessageComponentInteraction,
+    stats: &[Stat],
+) -> Result<Arc<MessageComponentInteraction>> {
+    info!("Asking user to choose a stat");
+    interaction
+        .create_interaction_response(ctx, |c| {
+            c.kind(InteractionResponseType::UpdateMessage)
+                .interaction_response_data(|m| {
+                    m.ephemeral(true)
+                        .content("Choose your stat / stat family")
+                        .components(|c| buttons_from_stats(c, stats))
+                })
+        })
+        .await?;
+    interaction
+        .get_interaction_response(ctx)
+        .await?
+        .await_component_interaction(ctx)
+        .timeout(Duration::from_secs(3 * 60))
+        .await
+        .context("Interaction failed")
 }
 
 /// Send a message asking the user to answer a question with yes or no
 pub async fn send_yes_no_message(
     ctx: &serenity::prelude::Context,
-    channel_id: &ChannelId,
+    command: &ApplicationCommandInteraction,
     content: &str,
-) -> Result<Message> {
-    channel_id
-        .send_message(ctx, |m| m.content(content).components(yes_no_buttons))
-        .await
-        .context("Failed to write message")
-}
-
-/// Send a message referencing all the commands
-pub async fn send_help_message(
-    ctx: &serenity::prelude::Context,
-    channel_id: &ChannelId,
-    content: &str,
-) -> Result<Message> {
-    channel_id
-        .send_message(ctx, |m| m.content(content).embed(|e| e.title("HELP").fields(vec![
-            ("!help", "Display this help message", false),
-            ("!ping", "Ping the bot to check if it is still available", false),
-            ("!roll", "Open an interactive message to roll a button for a specific stat, will update the experience of the player if a player file is associated with the discord user", false)
-        ])))
-        .await
-        .context("Failed to write message")
-}
-
-/// Wait for an interaction on the given message and return it
-pub async fn wait_for_interaction(
-    ctx: &serenity::prelude::Context,
-    msg: &Message,
 ) -> Result<Arc<MessageComponentInteraction>> {
-    msg.await_component_interaction(&ctx)
-        .timeout(Duration::from_secs(3 * 60))
-        .await
-        .context("Interaction timed out")
-}
-
-/// Update the message with a new stat choice
-pub async fn update_interaction_with_stats(
-    ctx: &serenity::prelude::Context,
-    interaction: &MessageComponentInteraction,
-    content: &str,
-    stats: &[Stat],
-) -> Result<()> {
-    interaction
-        .create_interaction_response(ctx, |r| {
-            r.kind(InteractionResponseType::UpdateMessage)
-                .interaction_response_data(|d| {
-                    d.content(content)
-                        .components(|c| buttons_from_stats(c, stats))
-                })
+    command
+        .create_interaction_response(ctx, |c| {
+            c.interaction_response_data(|m| {
+                m.content(content)
+                    .ephemeral(true)
+                    .components(yes_no_buttons)
+            })
         })
         .await
-        .context("Failed to update message")
+        .context("Failed to write message")?;
+    command
+        .get_interaction_response(&ctx)
+        .await?
+        .await_component_interaction(&ctx)
+        .timeout(Duration::from_secs(3 * 60))
+        .await
+        .context("Interaction failed")
 }
 
 /// Conclude an interaction by updating the message to a non interactive one
@@ -133,9 +138,9 @@ pub async fn finish_interaction(
     content: &str,
 ) -> Result<()> {
     interaction
-        .create_interaction_response(ctx, |r| {
-            r.kind(InteractionResponseType::UpdateMessage)
-                .interaction_response_data(|d| d.content(content).components(|c| c))
+        .create_interaction_response(ctx, |c| {
+            c.kind(InteractionResponseType::UpdateMessage)
+                .interaction_response_data(|d| d.ephemeral(true).content(content).components(|c| c))
         })
         .await
         .context("Failed to update message")
@@ -169,11 +174,17 @@ pub async fn display_result(
         .create_interaction_response(ctx, |r| {
             r.kind(InteractionResponseType::UpdateMessage)
                 .interaction_response_data(|d| {
-                    d.content("")
-                        .embed(|e| e.title(title).description(description).fields(fields))
-                        .components(|c| c)
+                    d.content("Successfully rolled dice").components(|c| c)
                 })
         })
-        .await
-        .context("Failed to update message")
+        .await?;
+    interaction
+        .channel_id
+        .send_message(ctx, |d| {
+            d.content("")
+                .embed(|e| e.title(title).description(description).fields(fields))
+                .components(|c| c)
+        })
+        .await?;
+    Ok(())
 }
