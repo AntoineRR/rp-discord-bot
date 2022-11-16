@@ -61,6 +61,7 @@ pub struct RollResult {
     pub player_name: Option<String>,
     pub roll: i32,
     pub threshold: Option<i32>,
+    pub new_mastery: Option<i32>,
     pub successful: Option<bool>,
 }
 
@@ -150,18 +151,22 @@ async fn choose_stat<'a: 'async_recursion>(
                 if let Err(e) = p.increase_experience(experience_earned, &stat.display_name) {
                     error!("Something went wrong when updating the player experience: {e}")
                 }
+                let new_mastery = (100.0
+                    - 99.0
+                        * f64::exp(-(player_experience + experience_earned) as f64 / coefficient))
+                    as i32;
 
-                let stat_type = StatType {
-                    is_talent,
-                    is_major_affinity,
-                    is_minor_affinity,
-                };
                 RollResult {
                     stat: stat.display_name.to_string(),
-                    stat_type,
+                    stat_type: StatType {
+                        is_talent,
+                        is_major_affinity,
+                        is_minor_affinity,
+                    },
                     player_name: Some(p.name),
                     roll,
                     threshold: Some(threshold),
+                    new_mastery: Some(new_mastery),
                     successful: Some(successful),
                 }
             }
@@ -175,6 +180,7 @@ async fn choose_stat<'a: 'async_recursion>(
                 player_name: None,
                 roll,
                 threshold: None,
+                new_mastery: None,
                 successful: None,
             },
         };

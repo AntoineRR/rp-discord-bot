@@ -61,7 +61,7 @@ fn check_validity(
     // Check validity of affinities
     let flat_affinities: Vec<Affinity> = affinities.iter().flat_map(|a| a.flatten()).collect();
     for affinity in flat_affinities {
-        if flat_stats.iter().any(|s| s.id == affinity.id) {
+        if !flat_stats.iter().any(|s| s.id == affinity.id) {
             return Err(format!(
                 "Affinity stat {:?} is not in stat file",
                 affinity.display_name

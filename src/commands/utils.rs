@@ -186,5 +186,19 @@ pub async fn display_result(
                 .components(|c| c)
         })
         .await?;
+
+    if let Some(t) = roll_result.threshold {
+        if let Some(m) = roll_result.new_mastery {
+            if m > t {
+                // Level up, the threshold will be higher for next rolls
+                interaction
+                    .channel_id
+                    .send_message(ctx, |d| {
+                        d.content(format!("🎉 Improved stat {} to {}!", roll_result.stat, m))
+                    })
+                    .await?;
+            }
+        }
+    }
     Ok(())
 }
