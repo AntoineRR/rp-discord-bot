@@ -6,9 +6,24 @@ pub trait TreeStructure {
     fn get_children(&self) -> &[Self]
     where
         Self: Clone;
+
     fn from_line(line: &str, children: &[Self]) -> Result<Self>
     where
         Self: Sized;
+
+    fn flatten(&self) -> Vec<Self>
+    where
+        Self: Sized + Clone,
+    {
+        if self.get_children().is_empty() {
+            vec![self.clone()]
+        } else {
+            self.get_children()
+                .iter()
+                .flat_map(|c| c.flatten())
+                .collect()
+        }
+    }
 }
 
 pub fn clean_input(c: char) -> char {
@@ -18,7 +33,7 @@ pub fn clean_input(c: char) -> char {
         'à' | 'â' => 'a',
         'ï' => 'i',
         'ô' => 'o',
-        'œ' => 'e',
+        'œ' => 'e', // We cannot replace by 'oe' because it is a &str not char
         ' ' | '-' | '/' => '_',
         c => c,
     }

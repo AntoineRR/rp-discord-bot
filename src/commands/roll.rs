@@ -121,7 +121,7 @@ async fn choose_stat<'a: 'async_recursion>(
                 // Find the limit for a success based on the experience in this stat
                 // TODO: allow customization of the function?
                 let player_experience = *p.stats.get(&stat.display_name).unwrap();
-                let is_talent = p.talent.contains(&stat.display_name);
+                let is_talent = p.talents.contains(&stat.display_name);
                 let is_major_affinity = p.affinities.is_major(&stat.display_name, affinities)?;
                 let is_minor_affinity = p.affinities.is_minor(&stat.display_name, affinities)?;
 

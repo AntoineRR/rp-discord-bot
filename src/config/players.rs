@@ -27,7 +27,7 @@ pub struct Player {
     pub discord_name: String,        // The discord pseudo of the player
     pub stats: HashMap<String, i32>, // The stats of the player along with his experience for each of them
     pub affinities: Affinities,      // The affinities of the player
-    pub talent: Vec<String>,         // The talents of the player (+20% on exp)
+    pub talents: Vec<String>,        // The talents of the player (+20% on exp)
 }
 
 impl Player {

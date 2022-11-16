@@ -38,7 +38,7 @@
     "Caelimancie": 16,
     "Charme": 89,
     "Contrôle de la Flore": 11,
-    "Contrôle des Créatures": 19,
+    "Contrôle de la Faune": 19,
     "Cuisine": 1,
     "Célérité": 130,
     "Cœur de pierre": 1,
@@ -50,7 +50,6 @@
     "Envoûtement": 46,
     "Etiquette": 89,
     "Force brute": 56,
-    "Fouille/vol": 75,
     "Fulgomancie": 1,
     "Galérien": 49,
     "Géomancie": 48,
@@ -58,7 +57,6 @@
     "Guérilla": 26,
     "Hache": 56,
     "Illusion": 24,
-    "Inquisition": 30,
     "Intimidation": 42,
     "Invocation": 75,
     "Lame courte": 48,
@@ -90,9 +88,11 @@
     "Résurrection": 15,
     "Sang-froid": 5,
     "Santé de fer": 78,
-    "Soins magiques": 20
+    "Soins magiques": 20,
+    "Télépathie": 30,
+    "Vol": 75
   },
-  "talent": [
+  "talents": [
     "Hache"
   ]
 }

@@ -22,7 +22,7 @@ Blindage
 Stoïcisme
     Résistance aux attaques magiques
     Sang-froid
-    Coeur de pierre
+    Cœur de pierre
 Persuasion
     Attendrissement
     Charme
