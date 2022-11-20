@@ -8,7 +8,7 @@ use serenity::{
 
 use crate::State;
 
-pub mod help;
+pub mod dice;
 pub mod ping;
 pub mod roll;
 pub mod utils;

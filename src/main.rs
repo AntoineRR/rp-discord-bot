@@ -21,8 +21,8 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         for command in [
             commands::ping::Ping::register,
-            commands::help::Help::register,
             commands::roll::Roll::register,
+            commands::dice::Dice::register,
         ] {
             if let Err(e) =
                 serenity::model::application::command::Command::create_global_application_command(
@@ -49,14 +49,14 @@ impl EventHandler for Handler {
 
             let command_name = command.data.name.as_str();
             let result = match command_name {
-                "help" => {
-                    commands::help::Help::run(&ctx, &command, state.read().await.borrow()).await
-                }
                 "ping" => {
                     commands::ping::Ping::run(&ctx, &command, state.read().await.borrow()).await
                 }
                 "roll" => {
                     commands::roll::Roll::run(&ctx, &command, state.read().await.borrow()).await
+                }
+                "dice" => {
+                    commands::dice::Dice::run(&ctx, &command, state.read().await.borrow()).await
                 }
                 _ => Err("Unimplemented command").map_err(anyhow::Error::msg),
             };

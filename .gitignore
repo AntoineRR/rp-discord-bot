@@ -2,5 +2,6 @@
 .env
 .vscode
 
+/config/players_backup
 /config/players/*
 !/config/players/player1.json
