@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs::read_dir};
 
-use super::affinity::Affinities;
+use super::affinity::{Affinities, Affinity};
 
 // https://stackoverflow.com/questions/67789198/how-can-i-sort-fields-in-alphabetic-order-when-serializing-with-serde
 // values get sorted because serde_json uses a BTreeMap internally
@@ -52,6 +52,21 @@ impl Player {
         std::fs::write(&self.path, to_save)
             .context(format!("Could not save player {}", &self.name))?;
         Ok(())
+    }
+
+    /// Is the provided stat a talent of this player?
+    pub fn is_talent(&self, stat: &str) -> bool {
+        self.talents.iter().any(|t| t == stat)
+    }
+
+    /// Is the provided affinity a major affinity?
+    pub fn is_major_affinity(&self, stat: &str, affinity_list: &[Affinity]) -> Result<bool> {
+        self.affinities.is_major(stat, affinity_list)
+    }
+
+    /// Is the provided affinity a minor affinity?
+    pub fn is_minor_affinity(&self, stat: &str, affinity_list: &[Affinity]) -> Result<bool> {
+        self.affinities.is_minor(stat, affinity_list)
     }
 }
 

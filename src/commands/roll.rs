@@ -23,7 +23,7 @@ use crate::{
 };
 
 use super::{
-    utils::{finish_interaction, send_choose_stats_message, send_yes_no_message},
+    utils::{finish_interaction, get_mastery, send_choose_stats_message, send_yes_no_message},
     Command,
 };
 
@@ -63,6 +63,47 @@ pub struct RollResult {
     pub threshold: Option<i32>,
     pub new_mastery: Option<i32>,
     pub successful: Option<bool>,
+}
+
+impl RollResult {
+    pub fn new(
+        stat: &str,
+        player: Option<Player>,
+        affinities: &[Affinity],
+        roll: i32,
+        threshold: Option<i32>,
+        new_mastery: Option<i32>,
+        successful: Option<bool>,
+    ) -> Result<Self> {
+        let (stat_type, player_name) = if let Some(p) = player {
+            (
+                StatType {
+                    is_talent: p.is_talent(stat),
+                    is_major_affinity: p.is_major_affinity(stat, affinities)?,
+                    is_minor_affinity: p.is_minor_affinity(stat, affinities)?,
+                },
+                Some(p.name),
+            )
+        } else {
+            (
+                StatType {
+                    is_talent: false,
+                    is_major_affinity: false,
+                    is_minor_affinity: false,
+                },
+                None,
+            )
+        };
+        Ok(Self {
+            stat: stat.to_string(),
+            stat_type,
+            player_name,
+            roll,
+            threshold,
+            new_mastery,
+            successful,
+        })
+    }
 }
 
 /// Updates the initial message until the user clicked an actual stat (leaf in the stat tree)
@@ -120,25 +161,7 @@ async fn choose_stat<'a: 'async_recursion>(
             Some(p_path) => {
                 let mut p = Player::from(p_path)?;
                 // Find the limit for a success based on the experience in this stat
-                // TODO: allow customization of the function?
-                let player_experience = *p.stats.get(&stat.display_name).unwrap();
-                let is_talent = p.talents.contains(&stat.display_name);
-                let is_major_affinity = p.affinities.is_major(&stat.display_name, affinities)?;
-                let is_minor_affinity = p.affinities.is_minor(&stat.display_name, affinities)?;
-
-                // Talent and affinities decrease the coefficient, meaning the player has a lower threshold to success in his roll
-                let mut coefficient = 334.6;
-                if is_talent {
-                    coefficient *= 1.0 - config.talent_increase_percentage;
-                }
-                if is_major_affinity {
-                    coefficient *= 1.0 - config.major_affinity_increase_percentage;
-                }
-                if is_minor_affinity {
-                    coefficient *= 1.0 - config.minor_affinity_increase_percentage;
-                }
-                let threshold =
-                    (100.0 - 99.0 * f64::exp(-player_experience as f64 / coefficient)) as i32;
+                let threshold = get_mastery(&p, &stat.display_name, config, affinities)?;
 
                 let (successful, experience_earned) = if roll > threshold {
                     info!("Player {} failed the check: {roll}/{threshold}", p.name);
@@ -151,38 +174,19 @@ async fn choose_stat<'a: 'async_recursion>(
                 if let Err(e) = p.increase_experience(experience_earned, &stat.display_name) {
                     error!("Something went wrong when updating the player experience: {e}")
                 }
-                let new_mastery = (100.0
-                    - 99.0
-                        * f64::exp(-(player_experience + experience_earned) as f64 / coefficient))
-                    as i32;
+                let new_mastery = get_mastery(&p, &stat.display_name, config, affinities)?;
 
-                RollResult {
-                    stat: stat.display_name.to_string(),
-                    stat_type: StatType {
-                        is_talent,
-                        is_major_affinity,
-                        is_minor_affinity,
-                    },
-                    player_name: Some(p.name),
+                RollResult::new(
+                    &stat.display_name,
+                    Some(p),
+                    affinities,
                     roll,
-                    threshold: Some(threshold),
-                    new_mastery: Some(new_mastery),
-                    successful: Some(successful),
-                }
+                    Some(threshold),
+                    Some(new_mastery),
+                    Some(successful),
+                )?
             }
-            None => RollResult {
-                stat: stat.display_name.to_string(),
-                stat_type: StatType {
-                    is_talent: false,
-                    is_major_affinity: false,
-                    is_minor_affinity: false,
-                },
-                player_name: None,
-                roll,
-                threshold: None,
-                new_mastery: None,
-                successful: None,
-            },
+            None => RollResult::new(&stat.display_name, None, affinities, roll, None, None, None)?,
         };
 
         // Update the message to display the result

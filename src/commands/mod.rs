@@ -11,6 +11,7 @@ use crate::State;
 pub mod dice;
 pub mod ping;
 pub mod roll;
+pub mod summary;
 pub mod utils;
 
 #[async_trait]

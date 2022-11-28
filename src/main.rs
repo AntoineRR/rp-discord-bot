@@ -7,7 +7,7 @@ use rp_tool::commands::Command;
 use rp_tool::State;
 use serenity::client::{Context, EventHandler};
 use serenity::model::prelude::interaction::Interaction;
-use serenity::model::prelude::Ready;
+use serenity::model::prelude::{GuildId, Ready};
 use serenity::prelude::{GatewayIntents, RwLock};
 use serenity::{async_trait, Client};
 use tracing::{error, info};
@@ -23,8 +23,14 @@ impl EventHandler for Handler {
             commands::ping::Ping::register,
             commands::roll::Roll::register,
             commands::dice::Dice::register,
+            commands::summary::Summary::register,
         ] {
-            if let Err(e) =
+            if let Ok(guild_id) = env::var("GUILD_ID") {
+                let guild = GuildId(guild_id.parse().expect("Wrong guild id set"));
+                if let Err(e) = guild.create_application_command(&ctx, |c| command(c)).await {
+                    error!("Could not register slash commands to guild: {e}");
+                }
+            } else if let Err(e) =
                 serenity::model::application::command::Command::create_global_application_command(
                     &ctx.http,
                     |c| command(c),
@@ -57,6 +63,10 @@ impl EventHandler for Handler {
                 }
                 "dice" => {
                     commands::dice::Dice::run(&ctx, &command, state.read().await.borrow()).await
+                }
+                "summary" => {
+                    commands::summary::Summary::run(&ctx, &command, state.read().await.borrow())
+                        .await
                 }
                 _ => Err("Unimplemented command").map_err(anyhow::Error::msg),
             };

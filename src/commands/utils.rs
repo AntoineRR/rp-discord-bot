@@ -13,7 +13,7 @@ use serenity::{
 };
 use tracing::info;
 
-use crate::config::stat::Stat;
+use crate::config::{affinity::Affinity, players::Player, stat::Stat, Config};
 
 use super::roll::RollResult;
 
@@ -125,7 +125,7 @@ pub async fn send_yes_no_message(
     command
         .get_interaction_response(&ctx)
         .await?
-        .await_component_interaction(&ctx)
+        .await_component_interaction(ctx)
         .timeout(Duration::from_secs(3 * 60))
         .await
         .context("Interaction failed")
@@ -201,4 +201,30 @@ pub async fn display_result(
         }
     }
     Ok(())
+}
+
+pub fn get_mastery(
+    p: &Player,
+    stat: &str,
+    config: &Config,
+    affinities: &[Affinity],
+) -> Result<i32> {
+    let player_experience = *p.stats.get(stat).unwrap();
+    let is_talent = p.is_talent(stat);
+    let is_major_affinity = p.is_major_affinity(stat, affinities)?;
+    let is_minor_affinity = p.is_minor_affinity(stat, affinities)?;
+
+    // Talent and affinities decrease the coefficient, meaning the player has a lower threshold to success in his roll
+    let mut coefficient = 334.6;
+    if is_talent {
+        coefficient *= 1.0 - config.talent_increase_percentage;
+    }
+    if is_major_affinity {
+        coefficient *= 1.0 - config.major_affinity_increase_percentage;
+    }
+    if is_minor_affinity {
+        coefficient *= 1.0 - config.minor_affinity_increase_percentage;
+    }
+    // TODO: allow customization of the function?
+    Ok((100.0 - 99.0 * f64::exp(-player_experience as f64 / coefficient)) as i32)
 }
