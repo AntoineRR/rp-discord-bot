@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 use super::parser::{clean_input, TreeStructure};
 
@@ -19,10 +19,9 @@ impl TreeStructure for Stat {
     /// The raw input will be cleaned to be used as an id for the stat
     fn from_line(raw_line: &str, sub_stats: &[Stat]) -> Result<Self> {
         if sub_stats.len() > 20 {
-            return Err(
+            return Err(anyhow!(
                 "There shouldn't be more than 20 stats in one category, check your stats.txt file.",
-            )
-            .map_err(anyhow::Error::msg);
+            ));
         }
 
         Ok(Stat {

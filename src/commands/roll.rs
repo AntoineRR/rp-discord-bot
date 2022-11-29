@@ -1,6 +1,6 @@
 use std::{fmt::Display, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
 use async_trait::async_trait;
 use rand::rngs::StdRng;
@@ -122,7 +122,7 @@ async fn choose_stat<'a: 'async_recursion>(
     // Get the stat selected by the user
     if res_id == "abort" {
         finish_interaction(ctx, interaction, "Command aborted").await?;
-        return Err("Aborted by user").map_err(anyhow::Error::msg);
+        return Err(anyhow!("Aborted by user"));
     }
     let stat = stats.iter().find(|&s| s.id == res_id).unwrap().clone();
     info!("Selected stat {}", stat.display_name);
@@ -212,7 +212,7 @@ async fn proceed_without_player_stats(
         Ok(interaction)
     } else {
         finish_interaction(ctx, &interaction, "Command aborted").await?;
-        Err("Aborted by user").map_err(anyhow::Error::msg)
+        Err(anyhow!("Aborted by user"))
     }
 }
 

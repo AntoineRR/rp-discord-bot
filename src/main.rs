@@ -2,6 +2,7 @@ use std::borrow::Borrow;
 use std::env;
 use std::process::exit;
 
+use anyhow::anyhow;
 use rp_tool::commands;
 use rp_tool::commands::Command;
 use rp_tool::State;
@@ -68,7 +69,7 @@ impl EventHandler for Handler {
                     commands::summary::Summary::run(&ctx, &command, state.read().await.borrow())
                         .await
                 }
-                _ => Err("Unimplemented command").map_err(anyhow::Error::msg),
+                _ => Err(anyhow!("Unimplemented command")),
             };
             match result {
                 Ok(()) => info!("Executed {command_name} command successfully"),

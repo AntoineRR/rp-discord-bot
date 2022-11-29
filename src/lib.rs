@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 use config::players::get_players;
 use config::stat::Stat;
@@ -62,11 +62,10 @@ fn check_validity(
     let flat_affinities: Vec<Affinity> = affinities.iter().flat_map(|a| a.flatten()).collect();
     for affinity in flat_affinities {
         if !flat_stats.iter().any(|s| s.id == affinity.id) {
-            return Err(format!(
+            return Err(anyhow!(
                 "Affinity stat {:?} is not in stat file",
                 affinity.display_name
-            ))
-            .map_err(anyhow::Error::msg);
+            ));
         }
     }
 
@@ -75,47 +74,47 @@ fn check_validity(
         let player = Player::from(file_path)?;
         for stat in player.stats.keys() {
             if !flat_stats.iter().any(|s| &s.display_name == stat) {
-                return Err(format!(
+                return Err(anyhow!(
                     "Stat {:?} from file {} is not in stat file",
-                    stat, file_path
-                ))
-                .map_err(anyhow::Error::msg);
+                    stat,
+                    file_path
+                ));
             }
         }
         for stat in &flat_stats {
             if !player.stats.iter().any(|(s, _)| s == &stat.display_name) {
-                return Err(format!(
+                return Err(anyhow!(
                     "Stat {:?} is not in file {}",
-                    stat.display_name, file_path
-                ))
-                .map_err(anyhow::Error::msg);
+                    stat.display_name,
+                    file_path
+                ));
             }
         }
         for major_affinity in player.affinities.major {
             if !affinities.iter().any(|a| a.display_name == major_affinity) {
-                return Err(format!(
+                return Err(anyhow!(
                     "Major affinity {:?} from file {} is not in stat file",
-                    major_affinity, file_path
-                ))
-                .map_err(anyhow::Error::msg);
+                    major_affinity,
+                    file_path
+                ));
             }
         }
         for minor_affinity in player.affinities.minor {
             if !affinities.iter().any(|a| a.display_name == minor_affinity) {
-                return Err(format!(
+                return Err(anyhow!(
                     "Minor affinity {:?} from file {} is not in stat file",
-                    minor_affinity, file_path
-                ))
-                .map_err(anyhow::Error::msg);
+                    minor_affinity,
+                    file_path
+                ));
             }
         }
         for talent in player.talents {
             if !flat_stats.iter().any(|s| s.display_name == talent) {
-                return Err(format!(
+                return Err(anyhow!(
                     "Talent {:?} from file {} is not in stat file",
-                    talent, file_path
-                ))
-                .map_err(anyhow::Error::msg);
+                    talent,
+                    file_path
+                ));
             }
         }
     }
