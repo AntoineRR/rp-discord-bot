@@ -228,11 +228,15 @@ pub async fn roll(
     // Getting info for the player from his discord name
     info!("Retrieving player info for {discord_name}");
     let player = state.players.get(discord_name).map(|x| &**x);
-    let interaction = if player.is_none() {
+    let is_game_master = discord_name == &state.config.game_master_discord_name;
+    let interaction = if player.is_none() && !is_game_master {
         warn!("Could not find info for player {discord_name}");
         let int = proceed_without_player_stats(ctx, command, discord_name).await?;
         info!("Proceeding without info");
         update_choose_stats_message(ctx, &int, &state.stats).await?
+    } else if player.is_none() && is_game_master {
+        info!("Skipping player info retrieval for game master");
+        send_choose_stats_message(ctx, command, &state.stats).await?
     } else {
         info!("Successfully retrieved player info for {discord_name}");
         send_choose_stats_message(ctx, command, &state.stats).await?

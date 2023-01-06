@@ -15,6 +15,7 @@ pub enum StatisticLaw {
 /// Corresponds to the customizable config file that can be modified by the user
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
+    pub game_master_discord_name: String,
     pub experience_earned_after_success: i32,
     pub experience_earned_after_failure: i32,
     pub talent_increase_percentage: f64,
