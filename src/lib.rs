@@ -32,7 +32,7 @@ impl State {
     pub fn from_config_files() -> Result<Self> {
         let config_folder = "./config";
         info!("Loading config from {}", config_folder);
-        let config = Config::from(&format!("{}/config.json", config_folder));
+        let config = Config::from(&format!("{}/config.json", config_folder))?;
         let stats = get_tree(&format!("{}/stats.txt", config_folder))?;
         let affinities = get_tree(&format!("{}/affinities.txt", config_folder))?;
         let players = get_players(&format!("{}/players", config_folder))?;

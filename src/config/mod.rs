@@ -1,3 +1,4 @@
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 pub mod affinity;
@@ -25,7 +26,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from(path: &str) -> Self {
-        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap()
+    pub fn from(path: &str) -> Result<Self> {
+        serde_json::from_str(&std::fs::read_to_string(path)?).map_err(anyhow::Error::from)
     }
 }

@@ -33,11 +33,7 @@ pub struct Player {
 impl Player {
     /// Create a Player from its representation file
     pub fn from(path: &str) -> Result<Self> {
-        let mut value: Player = serde_json::from_str(
-            &std::fs::read_to_string(path).context(format!("Could not read {path}"))?,
-        )
-        .context(format!("Could not parse {path}"))?;
-        // TODO: check that all stats are here
+        let mut value: Player = serde_json::from_str(&std::fs::read_to_string(path)?)?;
         value.path = path.to_string();
         Ok(value)
     }
