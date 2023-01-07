@@ -23,11 +23,12 @@ struct SortAlphabetically<T: Serialize>(#[serde(serialize_with = "sort_alphabeti
 pub struct Player {
     #[serde(skip)]
     path: String, // The path to the file representing this player
-    pub name: String,                // The name of the player in the game
-    pub discord_name: String,        // The discord pseudo of the player
+    pub name: String,                    // The name of the player in the game
+    pub discord_name: String,            // The discord pseudo of the player
     pub stats: HashMap<String, i32>, // The stats of the player along with his experience for each of them
     pub affinities: Affinities,      // The affinities of the player
     pub talents: Vec<String>,        // The talents of the player (+20% on exp)
+    pub modifiers: HashMap<String, i32>, // The permanent bonus and malus of the player (due to armors for example)
 }
 
 impl Player {
@@ -63,6 +64,14 @@ impl Player {
     /// Is the provided affinity a minor affinity?
     pub fn is_minor_affinity(&self, stat: &str, affinity_list: &[Affinity]) -> Result<bool> {
         self.affinities.is_minor(stat, affinity_list)
+    }
+
+    /// Get the bonus / malus for this stat
+    pub fn get_modifier(&self, stat: &str) -> i32 {
+        match self.modifiers.get(stat) {
+            Some(m) => *m,
+            None => 0,
+        }
     }
 }
 

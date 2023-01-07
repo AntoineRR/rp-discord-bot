@@ -9,6 +9,11 @@
     ]
   },
   "discord_name": "Obelix",
+  "modifiers": {
+    "Adamancie": 5,
+    "Agilité": -50,
+    "Alchimie": 60
+  },
   "name": "Asterix",
   "stats": {
     "Adamancie": 154,

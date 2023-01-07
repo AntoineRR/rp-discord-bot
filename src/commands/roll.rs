@@ -60,19 +60,22 @@ pub struct RollResult {
     pub stat_type: StatType,
     pub player_name: Option<String>,
     pub roll: i32,
-    pub threshold: Option<i32>,
+    pub mastery: Option<i32>,
     pub new_mastery: Option<i32>,
+    pub modifier: Option<i32>,
     pub successful: Option<bool>,
 }
 
 impl RollResult {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         stat: &str,
         player: Option<Player>,
         affinities: &[Affinity],
         roll: i32,
-        threshold: Option<i32>,
+        mastery: Option<i32>,
         new_mastery: Option<i32>,
+        modifier: Option<i32>,
         successful: Option<bool>,
     ) -> Result<Self> {
         let (stat_type, player_name) = if let Some(p) = player {
@@ -99,8 +102,9 @@ impl RollResult {
             stat_type,
             player_name,
             roll,
-            threshold,
+            mastery,
             new_mastery,
+            modifier,
             successful,
         })
     }
@@ -161,8 +165,10 @@ async fn choose_stat<'a: 'async_recursion>(
             Some(p_path) => {
                 let mut p = Player::from(p_path)?;
                 // Find the limit for a success based on the experience in this stat
-                let threshold = get_mastery(&p, &stat.display_name, config, affinities)?;
+                let mastery = get_mastery(&p, &stat.display_name, config, affinities)?;
+                let modifier = p.get_modifier(&stat.display_name);
 
+                let threshold = mastery + modifier;
                 let (successful, experience_earned) = if roll > threshold {
                     info!("Player {} failed the check: {roll}/{threshold}", p.name);
                     (false, config.experience_earned_after_failure)
@@ -181,12 +187,22 @@ async fn choose_stat<'a: 'async_recursion>(
                     Some(p),
                     affinities,
                     roll,
-                    Some(threshold),
+                    Some(mastery),
                     Some(new_mastery),
+                    Some(modifier),
                     Some(successful),
                 )?
             }
-            None => RollResult::new(&stat.display_name, None, affinities, roll, None, None, None)?,
+            None => RollResult::new(
+                &stat.display_name,
+                None,
+                affinities,
+                roll,
+                None,
+                None,
+                None,
+                None,
+            )?,
         };
 
         // Update the message to display the result

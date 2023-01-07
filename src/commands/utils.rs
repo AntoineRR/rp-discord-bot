@@ -167,8 +167,14 @@ pub async fn display_result(
         None => format!("*{}*", &roll_result.stat),
     };
     let mut fields = vec![("Roll", format!("*{}*", &roll_result.roll), true)];
-    if let Some(t) = roll_result.threshold {
-        fields.push(("Stat", format!("*{t}*"), true));
+    if let Some(mas) = roll_result.mastery {
+        let mut mas_display = format!("*{mas}*");
+        match roll_result.modifier {
+            Some(modif) if modif < 0 => mas_display += &format!(" - {}", modif.abs()),
+            Some(modif) if modif > 0 => mas_display += &format!(" + {}", modif.abs()),
+            _ => (),
+        }
+        fields.push(("Stat", mas_display, true));
     }
     interaction
         .create_interaction_response(ctx, |r| {
@@ -187,7 +193,7 @@ pub async fn display_result(
         })
         .await?;
 
-    if let Some(t) = roll_result.threshold {
+    if let Some(t) = roll_result.mastery {
         if let Some(m) = roll_result.new_mastery {
             if m > t {
                 // Level up, the threshold will be higher for next rolls
