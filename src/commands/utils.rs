@@ -215,7 +215,7 @@ pub fn get_mastery(
     let is_minor_affinity = p.is_minor_affinity(stat, affinities)?;
 
     // Talent and affinities decrease the coefficient, meaning the player has a lower threshold to success in his roll
-    let mut coefficient = 334.6;
+    let mut coefficient = config.learning_constant;
     if is_talent {
         coefficient *= 1.0 - config.talent_increase_percentage;
     }
