@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serenity::{
     builder::{CreateButton, CreateComponents},
     model::prelude::{
@@ -148,7 +148,8 @@ pub async fn finish_interaction(
 
 pub async fn display_result(
     ctx: &serenity::prelude::Context,
-    interaction: &MessageComponentInteraction,
+    interaction: Option<Arc<MessageComponentInteraction>>,
+    command: Option<&ApplicationCommandInteraction>,
     roll_result: &RollResult,
 ) -> Result<()> {
     let title = match &roll_result.successful {
@@ -156,16 +157,14 @@ pub async fn display_result(
         Some(false) => "FAILURE",
         None => "",
     };
-    let description = match &roll_result.player_name {
-        Some(n) => {
-            let stat_type = match roll_result.stat_type.is_special() {
-                true => format!("\n{}", roll_result.stat_type),
-                false => "".to_owned(),
-            };
-            format!("**{n}** / *{}*{}", &roll_result.stat, stat_type)
-        }
-        None => format!("*{}*", &roll_result.stat),
-    };
+    let mut description = format!("**{}**", &roll_result.player_name);
+    if let Some(stat) = &roll_result.stat {
+        let stat_type = match roll_result.stat_type.is_special() {
+            true => format!("\n{}", roll_result.stat_type),
+            false => "".to_owned(),
+        };
+        description += &format!(" / *{}*{}", stat, stat_type);
+    }
     let mut fields = vec![("Roll", format!("*{}*", &roll_result.roll), true)];
     if let Some(mas) = roll_result.mastery {
         let mut mas_display = format!("*{mas}*");
@@ -176,16 +175,31 @@ pub async fn display_result(
         }
         fields.push(("Stat", mas_display, true));
     }
-    interaction
-        .create_interaction_response(ctx, |r| {
+
+    let channel_id = if let Some(int) = interaction {
+        int.create_interaction_response(ctx, |r| {
             r.kind(InteractionResponseType::UpdateMessage)
                 .interaction_response_data(|d| {
                     d.content("Successfully rolled dice").components(|c| c)
                 })
         })
         .await?;
-    interaction
-        .channel_id
+        int.channel_id
+    } else if let Some(com) = command {
+        com.create_interaction_response(ctx, |r| {
+            r.interaction_response_data(|d| {
+                d.content("Successfully rolled dice")
+                    .ephemeral(true)
+                    .components(|c| c)
+            })
+        })
+        .await?;
+        com.channel_id
+    } else {
+        return Err(anyhow!("No interaction or command specified"));
+    };
+
+    channel_id
         .send_message(ctx, |d| {
             d.content("")
                 .embed(|e| e.title(title).description(description).fields(fields))
@@ -193,16 +207,17 @@ pub async fn display_result(
         })
         .await?;
 
-    if let Some(t) = roll_result.mastery {
-        if let Some(m) = roll_result.new_mastery {
-            if m > t {
-                // Level up, the threshold will be higher for next rolls
-                interaction
-                    .channel_id
-                    .send_message(ctx, |d| {
-                        d.content(format!("🎉 Improved stat {} to {}!", roll_result.stat, m))
-                    })
-                    .await?;
+    if let Some(stat) = &roll_result.stat {
+        if let Some(t) = roll_result.mastery {
+            if let Some(m) = roll_result.new_mastery {
+                if m > t {
+                    // Level up, the threshold will be higher for next rolls
+                    channel_id
+                        .send_message(ctx, |d| {
+                            d.content(format!("🎉 Improved stat {} to {}!", stat, m))
+                        })
+                        .await?;
+                }
             }
         }
     }

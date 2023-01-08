@@ -56,9 +56,9 @@ impl StatType {
 }
 
 pub struct RollResult {
-    pub stat: String,
+    pub stat: Option<String>,
     pub stat_type: StatType,
-    pub player_name: Option<String>,
+    pub player_name: String,
     pub roll: i32,
     pub mastery: Option<i32>,
     pub new_mastery: Option<i32>,
@@ -68,101 +68,80 @@ pub struct RollResult {
 
 impl RollResult {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub fn with_player(
         stat: &str,
-        player: Option<Player>,
+        player: Player,
         affinities: &[Affinity],
         roll: i32,
-        mastery: Option<i32>,
-        new_mastery: Option<i32>,
-        modifier: Option<i32>,
-        successful: Option<bool>,
+        mastery: i32,
+        new_mastery: i32,
+        modifier: i32,
+        successful: bool,
     ) -> Result<Self> {
-        let (stat_type, player_name) = if let Some(p) = player {
-            (
-                StatType {
-                    is_talent: p.is_talent(stat),
-                    is_major_affinity: p.is_major_affinity(stat, affinities)?,
-                    is_minor_affinity: p.is_minor_affinity(stat, affinities)?,
-                },
-                Some(p.name),
-            )
-        } else {
-            (
-                StatType {
-                    is_talent: false,
-                    is_major_affinity: false,
-                    is_minor_affinity: false,
-                },
-                None,
-            )
+        let stat_type = StatType {
+            is_talent: player.is_talent(stat),
+            is_major_affinity: player.is_major_affinity(stat, affinities)?,
+            is_minor_affinity: player.is_minor_affinity(stat, affinities)?,
         };
+        let player_name = player.name;
         Ok(Self {
-            stat: stat.to_string(),
+            stat: Some(stat.to_string()),
             stat_type,
             player_name,
             roll,
-            mastery,
-            new_mastery,
-            modifier,
-            successful,
+            mastery: Some(mastery),
+            new_mastery: Some(new_mastery),
+            modifier: Some(modifier),
+            successful: Some(successful),
         })
+    }
+
+    pub fn new(roll: i32, player_name: &str) -> Self {
+        Self {
+            stat: None,
+            stat_type: StatType {
+                is_talent: false,
+                is_major_affinity: false,
+                is_minor_affinity: false,
+            },
+            player_name: player_name.to_string(),
+            roll,
+            mastery: None,
+            new_mastery: None,
+            modifier: None,
+            successful: None,
+        }
     }
 }
 
-/// Updates the initial message until the user clicked an actual stat (leaf in the stat tree)
-/// Handle the recursion needed to go through the stat tree
-#[async_recursion]
-async fn choose_stat<'a: 'async_recursion>(
-    ctx: &serenity::prelude::Context,
-    interaction: &MessageComponentInteraction,
-    player: Option<&'a str>,
-    affinities: &[Affinity],
-    stats: &[Stat],
+fn get_roll(config: &Config) -> i32 {
+    match config.roll_command_statistic_law {
+        StatisticLaw::Uniform => {
+            let mut rng: StdRng = rand::SeedableRng::from_entropy();
+            rng.gen_range(1..101)
+        }
+        StatisticLaw::Normal(mean, std_dev) => Normal::new(mean, std_dev)
+            .unwrap()
+            .sample(&mut rand::thread_rng())
+            .clamp(1.0, 100.0) as i32,
+    }
+}
+
+fn get_roll_result(
+    discord_name: Option<&str>,
+    player_path: Option<&str>,
+    affinities: Option<&[Affinity]>,
+    stat: Option<&Stat>,
     config: &Config,
-) -> Result<()> {
-    let res_id = interaction.data.custom_id.to_string();
+) -> Result<RollResult> {
+    // Roll a dice
+    let roll = get_roll(config);
+    info!("Rolled a {roll}");
 
-    // Get the stat selected by the user
-    if res_id == "abort" {
-        finish_interaction(ctx, interaction, "Command aborted").await?;
-        return Err(anyhow!("Aborted by user"));
-    }
-    let stat = stats.iter().find(|&s| s.id == res_id).unwrap().clone();
-    info!("Selected stat {}", stat.display_name);
-
-    // If the stat has substats, we should let the user select one
-    if !stat.sub_stats.is_empty() {
-        // Recursion to check the stat chosen by the user
-        let interaction = update_choose_stats_message(ctx, interaction, &stat.sub_stats).await?;
-        choose_stat(
-            ctx,
-            &interaction,
-            player,
-            affinities,
-            &stat.sub_stats,
-            config,
-        )
-        .await?;
-    }
-    // The stat has no substats, time to end the recursion
-    else {
-        // Roll a dice
-        let roll = match config.roll_command_statistic_law {
-            StatisticLaw::Uniform => {
-                let mut rng: StdRng = rand::SeedableRng::from_entropy();
-                rng.gen_range(1..101)
-            }
-            StatisticLaw::Normal(mean, std_dev) => Normal::new(mean, std_dev)
-                .unwrap()
-                .sample(&mut rand::thread_rng())
-                .clamp(1.0, 100.0) as i32,
-        };
-        info!("Rolled a {roll} for stat {}", stat.display_name);
-
-        // Prepare info for the final message
-        let roll_result = match player {
-            Some(p_path) => {
+    if let Some(p_path) = player_path {
+        if let Some(stat) = stat {
+            if let Some(affinities) = affinities {
+                // Prepare info for the final message
                 let mut p = Player::from(p_path)?;
                 // Find the limit for a success based on the experience in this stat
                 let mastery = get_mastery(&p, &stat.display_name, config, affinities)?;
@@ -182,33 +161,80 @@ async fn choose_stat<'a: 'async_recursion>(
                 }
                 let new_mastery = get_mastery(&p, &stat.display_name, config, affinities)?;
 
-                RollResult::new(
+                Ok(RollResult::with_player(
                     &stat.display_name,
-                    Some(p),
+                    p,
                     affinities,
                     roll,
-                    Some(mastery),
-                    Some(new_mastery),
-                    Some(modifier),
-                    Some(successful),
-                )?
+                    mastery,
+                    new_mastery,
+                    modifier,
+                    successful,
+                )?)
+            } else {
+                return Err(anyhow!(
+                    "If player is specified affinities should be specified too"
+                ));
             }
-            None => RollResult::new(
-                &stat.display_name,
-                None,
-                affinities,
-                roll,
-                None,
-                None,
-                None,
-                None,
-            )?,
-        };
-
-        // Update the message to display the result
-        display_result(ctx, interaction, &roll_result).await?;
+        } else {
+            return Err(anyhow!(
+                "If player is specified a stat should be specified too"
+            ));
+        }
+    } else {
+        Ok(RollResult::new(
+            roll,
+            discord_name.ok_or_else(|| anyhow!("No player or discord name specified"))?,
+        ))
     }
-    Ok(())
+}
+
+/// Updates the initial message until the user clicked an actual stat (leaf in the stat tree)
+/// Handle the recursion needed to go through the stat tree
+#[async_recursion]
+async fn choose_stat(
+    ctx: &serenity::prelude::Context,
+    interaction: Arc<MessageComponentInteraction>,
+    player_path: &str,
+    affinities: &[Affinity],
+    stats: &[Stat],
+    config: &Config,
+) -> Result<(RollResult, Arc<MessageComponentInteraction>)> {
+    let res_id = interaction.data.custom_id.to_string();
+
+    // Get the stat selected by the user
+    if res_id == "abort" {
+        finish_interaction(ctx, &interaction, "Command aborted").await?;
+        return Err(anyhow!("Aborted by user"));
+    }
+    let stat = stats.iter().find(|&s| s.id == res_id).unwrap().clone();
+    info!("Selected stat {}", stat.display_name);
+
+    // If the stat has substats, we should let the user select one
+    if !stat.sub_stats.is_empty() {
+        // Recursion to check the stat chosen by the user
+        let interaction = update_choose_stats_message(ctx, &interaction, &stat.sub_stats).await?;
+        choose_stat(
+            ctx,
+            interaction,
+            player_path,
+            affinities,
+            &stat.sub_stats,
+            config,
+        )
+        .await
+    }
+    // The stat has no substats, time to end the recursion
+    else {
+        let roll_result = get_roll_result(
+            None,
+            Some(player_path),
+            Some(affinities),
+            Some(&stat),
+            config,
+        )?;
+        Ok((roll_result, interaction))
+    }
 }
 
 async fn proceed_without_player_stats(
@@ -219,7 +245,7 @@ async fn proceed_without_player_stats(
     let interaction = send_yes_no_message(
         ctx,
         command,
-        &format!("No player stats found for player {discord_name}.\nDo you still want to proceed?"),
+        &format!("No player stats found for player {discord_name} and you are not a game master.\nDo you still want to proceed?"),
     )
     .await
     .unwrap();
@@ -245,30 +271,32 @@ pub async fn roll(
     info!("Retrieving player info for {discord_name}");
     let player = state.players.get(discord_name).map(|x| &**x);
     let is_game_master = discord_name == &state.config.game_master_discord_name;
-    let interaction = if player.is_none() && !is_game_master {
+    let (roll_result, interaction) = if player.is_none() && !is_game_master {
         warn!("Could not find info for player {discord_name}");
-        let int = proceed_without_player_stats(ctx, command, discord_name).await?;
+        let interaction = proceed_without_player_stats(ctx, command, discord_name).await?;
         info!("Proceeding without info");
-        update_choose_stats_message(ctx, &int, &state.stats).await?
+        let roll_result = get_roll_result(Some(discord_name), None, None, None, &state.config)?;
+        (roll_result, Some(interaction))
     } else if player.is_none() && is_game_master {
         info!("Skipping player info retrieval for game master");
-        send_choose_stats_message(ctx, command, &state.stats).await?
+        let roll_result = get_roll_result(Some(discord_name), None, None, None, &state.config)?;
+        (roll_result, None)
     } else {
         info!("Successfully retrieved player info for {discord_name}");
-        send_choose_stats_message(ctx, command, &state.stats).await?
+        let interaction = send_choose_stats_message(ctx, command, &state.stats).await?;
+        // Guide the user through the stat tree to choose a stat
+        let (roll_result, interaction) = choose_stat(
+            ctx,
+            interaction,
+            player.unwrap(),
+            &state.affinities,
+            &state.stats,
+            &state.config,
+        )
+        .await?;
+        (roll_result, Some(interaction))
     };
-
-    // Guide the user through the stat tree to choose a stat
-    choose_stat(
-        ctx,
-        &interaction,
-        player,
-        &state.affinities,
-        &state.stats,
-        &state.config,
-    )
-    .await?;
-
+    display_result(ctx, interaction, Some(command), &roll_result).await?;
     Ok(())
 }
 
