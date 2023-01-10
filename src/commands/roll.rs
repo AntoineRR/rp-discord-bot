@@ -172,14 +172,14 @@ fn get_roll_result(
                     successful,
                 )?)
             } else {
-                return Err(anyhow!(
+                Err(anyhow!(
                     "If player is specified affinities should be specified too"
-                ));
+                ))
             }
         } else {
-            return Err(anyhow!(
+            Err(anyhow!(
                 "If player is specified a stat should be specified too"
-            ));
+            ))
         }
     } else {
         Ok(RollResult::new(
