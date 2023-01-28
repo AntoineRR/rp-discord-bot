@@ -163,7 +163,7 @@ pub async fn display_result(
             true => format!("\n{}", roll_result.stat_type),
             false => "".to_owned(),
         };
-        description += &format!(" / *{}*{}", stat, stat_type);
+        description += &format!(" / *{stat}*{stat_type}");
     }
     let mut fields = vec![("Roll", format!("*{}*", &roll_result.roll), true)];
     if let Some(mas) = roll_result.mastery {
@@ -214,7 +214,7 @@ pub async fn display_result(
                     // Level up, the threshold will be higher for next rolls
                     channel_id
                         .send_message(ctx, |d| {
-                            d.content(format!("🎉 Improved stat {} to {}!", stat, m))
+                            d.content(format!("🎉 Improved stat {stat} to {m}!"))
                         })
                         .await?;
                 }

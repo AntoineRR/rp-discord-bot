@@ -31,11 +31,11 @@ impl TypeMapKey for State {
 impl State {
     pub fn from_config_files() -> Result<Self> {
         let config_folder = "./config";
-        info!("Loading config from {}", config_folder);
-        let config = Config::from(&format!("{}/config.json", config_folder))?;
-        let stats = get_tree(&format!("{}/stats.txt", config_folder))?;
-        let affinities = get_tree(&format!("{}/affinities.txt", config_folder))?;
-        let players = get_players(&format!("{}/players", config_folder))?;
+        info!("Loading config from {config_folder}");
+        let config = Config::from(&format!("{config_folder}/config.json"))?;
+        let stats = get_tree(&format!("{config_folder}/stats.txt"))?;
+        let affinities = get_tree(&format!("{config_folder}/affinities.txt"))?;
+        let players = get_players(&format!("{config_folder}/players"))?;
 
         check_validity(&stats, &affinities, &players)?;
         info!("Config files are correct");

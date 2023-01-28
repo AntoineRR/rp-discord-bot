@@ -40,10 +40,10 @@ impl Command for Summary {
             None => bail!("Invalid player"),
         };
 
-        let stats: Vec<&str> = player.stats.iter().map(|(key, _)| key.as_str()).collect();
+        let stats: Vec<&str> = player.stats.keys().map(|key| key.as_str()).collect();
         let page_number = stats.len() / 25 + 1;
         let (description, remaining_fields) = if page_number > 1 {
-            (format!("Page 1/{}", page_number), &stats[25..])
+            (format!("Page 1/{page_number}"), &stats[25..])
         } else {
             ("".to_owned(), &[] as &[&str])
         };
