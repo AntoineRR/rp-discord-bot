@@ -1,11 +1,12 @@
 [package]
 name = "rp-tool"
-version = "0.2.0"
+version = "0.2.2"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ansi_term = "0.12.1"
 anyhow = "1.0.66"
 async-recursion = "1.0.0"
 async-trait = "0.1.58"

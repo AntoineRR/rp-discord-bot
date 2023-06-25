@@ -31,6 +31,24 @@ DISCORD_TOKEN=<your-token>
 - the `config/config.json` file allows for some app configuration.
 - Run the app: `cargo run`. This requires Rust (developed using v1.64).
 
+## How to build:
+
+I am working on Linux and cross compile for Windows. To do so, I use the `cross` crate. To install it, run:
+```bash
+cargo install cross
+```
+
+Then, to build the app for Windows, run:
+```bash
+cross build --target x86_64-pc-windows-gnu --release
+```
+You will sometimes need to run `cargo clean` before building to clear your cache.
+
+To build the app for Linux, simply run:
+```bash
+cargo build --release
+```
+
 ## TODO:
 
 - Add a shortcut for dice rolls (eg: /roll agility)

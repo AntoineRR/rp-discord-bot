@@ -1,6 +1,5 @@
 use std::borrow::Borrow;
 use std::env;
-use std::process::exit;
 
 use anyhow::anyhow;
 use rp_tool::commands;
@@ -81,17 +80,27 @@ impl EventHandler for Handler {
 
 #[tokio::main]
 async fn main() {
+    // Setup panic hook
+    std::panic::set_hook(Box::new(|panic_info| {
+        error!("{panic_info}");
+        println!("Press enter to continue...");
+        std::io::stdin().read_line(&mut String::new()).unwrap();
+    }));
+
     // Setup tracing
+    #[cfg(target_os = "windows")]
+    {
+        // Enable ANSI support on windows to get colors in the console
+        ansi_term::enable_ansi_support().unwrap();
+    }
     let subscriber = tracing_subscriber::FmtSubscriber::new();
     tracing::subscriber::set_global_default(subscriber)
-        .map_err(|e| eprintln!("Unable to set global default subscriber: {e}"))
-        .ok();
+        .unwrap_or_else(|e| panic!("Unable to set global default subscriber: {e}"));
 
     // Get the discord token from a .env file
     dotenv::dotenv().ok();
     let token = env::var("DISCORD_TOKEN").unwrap_or_else(|e| {
-        error!("Expected a discord token in the .env file: {e}");
-        exit(1);
+        panic!("Expected a discord token in the .env file: {e}");
     });
     info!("Found discord token in .env file");
 
@@ -106,8 +115,7 @@ async fn main() {
         .event_handler(Handler)
         .await
         .unwrap_or_else(|e| {
-            error!("Error creating client: {e}");
-            exit(1);
+            panic!("Error creating client: {e}");
         });
     info!("Client is setup");
 
@@ -115,8 +123,7 @@ async fn main() {
     let state = match State::from_config_files() {
         Ok(s) => s,
         Err(e) => {
-            error!("An error occurred while parsing your config files: {e}");
-            exit(1);
+            panic!("An error occurred while parsing your config files: {e}");
         }
     };
     info!("Config files loaded successfully");
@@ -129,7 +136,6 @@ async fn main() {
     }
     // Finally, start a single shard, and start listening to events.
     if let Err(err) = client.start().await {
-        error!("Client error: {:?}", err);
-        exit(1);
+        panic!("Client error: {err:?}");
     }
 }
