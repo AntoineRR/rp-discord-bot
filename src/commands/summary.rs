@@ -54,7 +54,7 @@ impl Command for Summary {
                     m.ephemeral(true).embed(|e| {
                         e.title(format!("**{}**", &player.name))
                             .description(description)
-                            .fields(stats.iter().map(|stat| {
+                            .fields(stats[..25].iter().map(|stat| {
                                 (
                                     stat,
                                     format_stat_infos(

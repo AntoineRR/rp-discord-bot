@@ -26,7 +26,7 @@ impl Command for Dice {
         let faces = command
             .data
             .options
-            .get(0)
+            .first()
             .unwrap()
             .resolved
             .as_ref()
