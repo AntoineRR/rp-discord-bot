@@ -1,12 +1,9 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Result};
-
 use config::players::get_players;
 use config::stat::Stat;
 use config::Config;
 use config::{affinity::Affinity, parser::TreeStructure};
-use serenity::prelude::{RwLock, TypeMapKey};
 use tracing::info;
 
 use crate::config::parser::get_tree;
@@ -14,6 +11,9 @@ use crate::config::players::Player;
 
 pub mod commands;
 mod config;
+
+pub type Error = Box<dyn std::error::Error + Send + Sync>;
+pub type Context<'a> = poise::Context<'a, State, Error>;
 
 /// Holds the configuration, list of stats, and player infos at all time
 #[derive(Debug)]
@@ -24,12 +24,8 @@ pub struct State {
     players: HashMap<String, String>, // The mapping of a discord name with a player file name
 }
 
-impl TypeMapKey for State {
-    type Value = RwLock<Self>;
-}
-
 impl State {
-    pub fn from_config_files() -> Result<Self> {
+    pub fn from_config_files() -> Result<Self, Error> {
         let config_folder = "./config";
         info!("Loading config from {config_folder}");
         let config = Config::from(&format!("{config_folder}/config.json"))?;
@@ -53,7 +49,7 @@ fn check_validity(
     stats: &[Stat],
     affinities: &[Affinity],
     players: &HashMap<String, String>,
-) -> Result<()> {
+) -> Result<(), Error> {
     info!("Checking config files coherence...");
     // Create a flat vec of stats
     let flat_stats: Vec<Stat> = stats.iter().flat_map(|s| s.flatten()).collect();
@@ -62,10 +58,11 @@ fn check_validity(
     let flat_affinities: Vec<Affinity> = affinities.iter().flat_map(|a| a.flatten()).collect();
     for affinity in flat_affinities {
         if !flat_stats.iter().any(|s| s.id == affinity.id) {
-            return Err(anyhow!(
+            return Err(format!(
                 "Affinity stat {:?} is not in stat file",
-                affinity.display_name
-            ));
+                affinity.display_name,
+            )
+            .into());
         }
     }
 
@@ -74,47 +71,45 @@ fn check_validity(
         let player = Player::from(file_path)?;
         for stat in player.stats.keys() {
             if !flat_stats.iter().any(|s| &s.display_name == stat) {
-                return Err(anyhow!(
+                return Err(format!(
                     "Stat {:?} from file {} is not in stat file",
-                    stat,
-                    file_path
-                ));
+                    stat, file_path
+                )
+                .into());
             }
         }
         for stat in &flat_stats {
             if !player.stats.iter().any(|(s, _)| s == &stat.display_name) {
-                return Err(anyhow!(
-                    "Stat {:?} is not in file {}",
-                    stat.display_name,
-                    file_path
-                ));
+                return Err(
+                    format!("Stat {:?} is not in file {}", stat.display_name, file_path).into(),
+                );
             }
         }
         for major_affinity in player.affinities.major {
             if !affinities.iter().any(|a| a.display_name == major_affinity) {
-                return Err(anyhow!(
+                return Err(format!(
                     "Major affinity {:?} from file {} is not in stat file",
-                    major_affinity,
-                    file_path
-                ));
+                    major_affinity, file_path
+                )
+                .into());
             }
         }
         for minor_affinity in player.affinities.minor {
             if !affinities.iter().any(|a| a.display_name == minor_affinity) {
-                return Err(anyhow!(
+                return Err(format!(
                     "Minor affinity {:?} from file {} is not in stat file",
-                    minor_affinity,
-                    file_path
-                ));
+                    minor_affinity, file_path
+                )
+                .into());
             }
         }
         for talent in player.talents {
             if !flat_stats.iter().any(|s| s.display_name == talent) {
-                return Err(anyhow!(
+                return Err(format!(
                     "Talent {:?} from file {} is not in stat file",
-                    talent,
-                    file_path
-                ));
+                    talent, file_path
+                )
+                .into());
             }
         }
     }

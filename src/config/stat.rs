@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use crate::Error;
 
 use super::parser::{clean_input, TreeStructure};
 
@@ -17,11 +17,12 @@ impl TreeStructure for Stat {
 
     /// Create a Stat from a raw line of the file
     /// The raw input will be cleaned to be used as an id for the stat
-    fn from_line(raw_line: &str, sub_stats: &[Stat]) -> Result<Self> {
+    fn from_line(raw_line: &str, sub_stats: &[Stat]) -> Result<Self, Error> {
         if sub_stats.len() > 20 {
-            return Err(anyhow!(
-                "There shouldn't be more than 20 stats in one category, check your stats.txt file.",
-            ));
+            return Err(
+                "There shouldn't be more than 20 stats in one category, check your stats.txt file."
+                    .into(),
+            );
         }
 
         Ok(Stat {

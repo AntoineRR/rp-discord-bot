@@ -1,108 +1,77 @@
-use anyhow::{bail, Context, Result};
-use async_trait::async_trait;
-use serenity::{
-    builder::CreateApplicationCommand,
-    model::prelude::interaction::application_command::ApplicationCommandInteraction,
-};
+use poise::serenity_prelude::CreateEmbed;
+use poise::CreateReply;
 
 use crate::config::affinity::Affinity;
 use crate::config::Config;
 use crate::Player;
-use crate::State;
 
 use super::utils::get_mastery;
-use super::Command;
+use crate::{Context, Error};
+
+static DISCORD_FIELD_LIMIT: usize = 25;
 
 fn format_stat_infos(
     p: &Player,
     stat: &str,
     config: &Config,
     affinities: &[Affinity],
-) -> Result<String> {
+) -> Result<String, Error> {
     let mastery = get_mastery(p, stat, config, affinities)?;
-    let exp = *p.stats.get(stat).unwrap();
+    let exp = *p
+        .stats
+        .get(stat)
+        .ok_or(format!("Stat {stat} not found for player"))?;
     Ok(format!("**{mastery}** ({exp} xp)"))
 }
 
-pub struct Summary;
+/// Display the summary of the player's stats.
+#[poise::command(slash_command)]
+pub async fn summary(ctx: Context<'_>) -> Result<(), Error> {
+    let discord_name = &ctx.author().name;
+    let player_path = ctx.data().players.get(discord_name);
+    match player_path {
+        Some(p) => {
+            let player = Player::from(p)?;
+            let stats: Vec<&str> = player.stats.keys().map(|key| key.as_str()).collect();
+            let page_number = stats.len() / DISCORD_FIELD_LIMIT + 1;
 
-#[async_trait]
-impl Command for Summary {
-    async fn run(
-        ctx: &serenity::prelude::Context,
-        command: &ApplicationCommandInteraction,
-        state: &State,
-    ) -> Result<()> {
-        let discord_name = &command.user.name;
-        let player_path = state.players.get(discord_name).map(|x| &**x);
-        let player = match player_path {
-            Some(p) => Player::from(p).unwrap(),
-            None => bail!("Invalid player"),
-        };
-
-        let stats: Vec<&str> = player.stats.keys().map(|key| key.as_str()).collect();
-        let page_number = stats.len() / 25 + 1;
-        let (description, remaining_fields) = if page_number > 1 {
-            (format!("Page 1/{page_number}"), &stats[25..])
-        } else {
-            ("".to_owned(), &[] as &[&str])
-        };
-
-        command
-            .create_interaction_response(ctx, |c| {
-                c.interaction_response_data(|m| {
-                    m.ephemeral(true).embed(|e| {
-                        e.title(format!("**{}**", &player.name))
+            for (idx, chunk) in stats.chunks(25).enumerate() {
+                let description = if page_number > 1 {
+                    format!("Page {}/{}", idx + 1, page_number)
+                } else {
+                    "".to_owned()
+                };
+                ctx.send(
+                    CreateReply::default().ephemeral(true).embed(
+                        CreateEmbed::default()
+                            .title(format!("**{}**", &player.name))
                             .description(description)
-                            .fields(stats[..25].iter().map(|stat| {
+                            .fields(chunk.iter().map(|&stat| {
                                 (
                                     stat,
                                     format_stat_infos(
                                         &player,
                                         stat,
-                                        &state.config,
-                                        &state.affinities,
+                                        &ctx.data().config,
+                                        &ctx.data().affinities,
                                     )
                                     .unwrap(),
                                     true,
                                 )
-                            }))
-                    })
-                })
-            })
-            .await
-            .context("Failed to write message")?;
-
-        for (idx, chunk) in remaining_fields.chunks(25).enumerate() {
-            let description = format!("Page {}/{}", idx + 2, page_number);
-            command
-                .create_followup_message(&ctx, |m| {
-                    m.ephemeral(true).embed(|e| {
-                        e.title(format!("**{}**", &player.name))
-                            .description(description)
-                            .fields(chunk.iter().map(|stat| {
-                                (
-                                    stat,
-                                    format_stat_infos(
-                                        &player,
-                                        stat,
-                                        &state.config,
-                                        &state.affinities,
-                                    )
-                                    .unwrap(),
-                                    true,
-                                )
-                            }))
-                    })
-                })
+                            })),
+                    ),
+                )
                 .await?;
+            }
         }
-        Ok(())
+        None => {
+            ctx.send(
+                CreateReply::default()
+                    .ephemeral(true)
+                    .content("You don't have player data yet."),
+            )
+            .await?;
+        }
     }
-
-    fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-        command
-            .name("summary")
-            .description("Display a summary of a player stats")
-    }
+    Ok(())
 }

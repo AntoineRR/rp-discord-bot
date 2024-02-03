@@ -1,6 +1,7 @@
-use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs::read_dir};
+
+use crate::Error;
 
 use super::affinity::{Affinities, Affinity};
 
@@ -33,21 +34,19 @@ pub struct Player {
 
 impl Player {
     /// Create a Player from its representation file
-    pub fn from(path: &str) -> Result<Self> {
+    pub fn from(path: &str) -> Result<Self, Error> {
         let mut value: Player = serde_json::from_str(&std::fs::read_to_string(path)?)?;
         value.path = path.to_string();
         Ok(value)
     }
 
     /// Increase the experience of the player in the given stat by the given amount
-    pub fn increase_experience(&mut self, exp_to_add: i32, stat_name: &str) -> Result<()> {
+    pub fn increase_experience(&mut self, exp_to_add: i32, stat_name: &str) -> Result<(), Error> {
         self.stats
             .entry(stat_name.to_string())
             .and_modify(|value| *value += exp_to_add);
-        let to_save = serde_json::to_string_pretty(&SortAlphabetically(&self))
-            .context(format!("Could not serialize player {}", &self.name))?;
-        std::fs::write(&self.path, to_save)
-            .context(format!("Could not save player {}", &self.name))?;
+        let to_save = serde_json::to_string_pretty(&SortAlphabetically(&self))?;
+        std::fs::write(&self.path, to_save)?;
         Ok(())
     }
 
@@ -57,12 +56,12 @@ impl Player {
     }
 
     /// Is the provided affinity a major affinity?
-    pub fn is_major_affinity(&self, stat: &str, affinity_list: &[Affinity]) -> Result<bool> {
+    pub fn is_major_affinity(&self, stat: &str, affinity_list: &[Affinity]) -> Result<bool, Error> {
         self.affinities.is_major(stat, affinity_list)
     }
 
     /// Is the provided affinity a minor affinity?
-    pub fn is_minor_affinity(&self, stat: &str, affinity_list: &[Affinity]) -> Result<bool> {
+    pub fn is_minor_affinity(&self, stat: &str, affinity_list: &[Affinity]) -> Result<bool, Error> {
         self.affinities.is_minor(stat, affinity_list)
     }
 
@@ -76,9 +75,8 @@ impl Player {
 }
 
 /// Parse and get the players from the "players" folder
-pub fn get_players(path: &str) -> Result<HashMap<String, String>> {
-    let player_paths =
-        read_dir(path).context("You should have a 'players' directory in the config folder")?;
+pub fn get_players(path: &str) -> Result<HashMap<String, String>, Error> {
+    let player_paths = read_dir(path)?;
 
     Ok(player_paths
         .map(|p| {
@@ -86,7 +84,7 @@ pub fn get_players(path: &str) -> Result<HashMap<String, String>> {
             let path_str = path.as_os_str().to_str().unwrap();
             Player::from(path_str)
         })
-        .collect::<Result<Vec<Player>>>()?
+        .collect::<Result<Vec<Player>, Error>>()?
         .iter()
         .map(|p| (p.discord_name.to_string(), p.path.to_string()))
         .collect())

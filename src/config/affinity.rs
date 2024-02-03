@@ -1,5 +1,6 @@
-use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+
+use crate::Error;
 
 use super::parser::{clean_input, TreeStructure};
 
@@ -18,7 +19,7 @@ impl TreeStructure for Affinity {
 
     /// Create an Affinity from a raw line of the file
     /// The raw input will be cleaned to be used as an id for the affinity
-    fn from_line(raw_line: &str, stats: &[Affinity]) -> Result<Self> {
+    fn from_line(raw_line: &str, stats: &[Affinity]) -> Result<Self, Error> {
         Ok(Affinity {
             id: raw_line.trim().chars().map(clean_input).collect(),
             display_name: raw_line.trim().to_string(),
@@ -34,7 +35,7 @@ pub struct Affinities {
 }
 
 impl Affinities {
-    pub fn is_major(&self, stat: &str, affinity_list: &[Affinity]) -> Result<bool> {
+    pub fn is_major(&self, stat: &str, affinity_list: &[Affinity]) -> Result<bool, Error> {
         for name in &self.major {
             if is_stat_in_affinity(stat, name, affinity_list)? {
                 return Ok(true);
@@ -43,7 +44,7 @@ impl Affinities {
         Ok(false)
     }
 
-    pub fn is_minor(&self, stat: &str, affinity_list: &[Affinity]) -> Result<bool> {
+    pub fn is_minor(&self, stat: &str, affinity_list: &[Affinity]) -> Result<bool, Error> {
         for name in &self.minor {
             if is_stat_in_affinity(stat, name, affinity_list)? {
                 return Ok(true);
@@ -57,11 +58,13 @@ fn is_stat_in_affinity(
     stat: &str,
     affinity_name: &str,
     affinity_list: &[Affinity],
-) -> Result<bool> {
+) -> Result<bool, Error> {
     let affinity = affinity_list
         .iter()
         .find(|&a| a.display_name == affinity_name)
-        .context("Affinity not found in the list of affinities")?;
+        .ok_or(format!(
+            "Affinity {affinity_name} not found in the list of affinities"
+        ))?;
     if affinity.stats.is_empty() {
         Ok(affinity.display_name == stat)
     } else {
