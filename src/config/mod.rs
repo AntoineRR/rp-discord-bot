@@ -1,5 +1,6 @@
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
+
+use crate::Error;
 
 pub mod affinity;
 pub mod parser;
@@ -27,7 +28,8 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from(path: &str) -> Result<Self> {
-        serde_json::from_str(&std::fs::read_to_string(path)?).map_err(anyhow::Error::from)
+    pub fn from(path: &str) -> Result<Self, Error> {
+        let result = serde_json::from_str(&std::fs::read_to_string(path)?)?;
+        Ok(result)
     }
 }

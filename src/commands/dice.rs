@@ -1,80 +1,38 @@
-use anyhow::{bail, Context, Result};
-use async_trait::async_trait;
+use poise::serenity_prelude::CreateEmbed;
+use poise::CreateReply;
 use rand::{rngs::StdRng, Rng};
-use serenity::{
-    builder::CreateApplicationCommand,
-    model::prelude::{
-        command::CommandOptionType,
-        interaction::application_command::{ApplicationCommandInteraction, CommandDataOptionValue},
-    },
-};
 use tracing::info;
 
-use crate::{config::players::Player, State};
+use crate::{config::players::Player, Context, Error};
 
-use super::Command;
+/// Roll a dice with a given number of faces.
+#[poise::command(slash_command)]
+pub async fn dice(
+    ctx: Context<'_>,
+    #[description = "Number of faces of the dice"] faces: u32,
+) -> Result<(), Error> {
+    info!("Rolling a dice with {faces} faces");
 
-pub struct Dice;
+    let discord_name = &ctx.author().name;
+    let player = ctx.data().players.get(discord_name);
+    let player_name = match player {
+        Some(p) => Player::from(p)?.name,
+        None => discord_name.to_owned(),
+    };
 
-#[async_trait]
-impl Command for Dice {
-    async fn run(
-        ctx: &serenity::prelude::Context,
-        command: &ApplicationCommandInteraction,
-        state: &State,
-    ) -> Result<()> {
-        let faces = command
-            .data
-            .options
-            .first()
-            .unwrap()
-            .resolved
-            .as_ref()
-            .context("Expected a number of faces")?;
+    let mut rng: StdRng = rand::SeedableRng::from_entropy();
+    let roll = rng.gen_range(1..(faces + 1));
 
-        let faces = match faces {
-            CommandDataOptionValue::Integer(f) => f,
-            _ => bail!("Please provide a valid number of faces"),
-        };
+    info!("Rolled {roll}/{faces}");
 
-        info!("Rolling a dice with {faces} faces");
+    ctx.send(
+        CreateReply::default().embed(
+            CreateEmbed::default()
+                .title(format!("**{player_name}**"))
+                .description(format!("d{faces}: **{roll}**")),
+        ),
+    )
+    .await?;
 
-        let discord_name = &command.user.name;
-        let player = state.players.get(discord_name).map(|x| &**x);
-        let player_name = match player {
-            Some(p) => Player::from(p).unwrap().name,
-            None => discord_name.to_owned(),
-        };
-
-        let mut rng: StdRng = rand::SeedableRng::from_entropy();
-        let roll = rng.gen_range(1..(faces + 1));
-
-        info!("Rolled {roll}/{faces}");
-
-        command
-            .create_interaction_response(ctx, |c| {
-                c.interaction_response_data(|m| {
-                    m.embed(|e| {
-                        e.title(format!("**{player_name}**"))
-                            .description(format!("d{faces}: **{roll}**"))
-                    })
-                })
-            })
-            .await
-            .context("Failed to write message")
-    }
-
-    fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-        command
-            .name("dice")
-            .create_option(|option| {
-                option
-                    .name("faces")
-                    .description("The number of faces of the dice")
-                    .kind(CommandOptionType::Integer)
-                    .required(true)
-                    .min_int_value(2)
-            })
-            .description("roll a dice")
-    }
+    Ok(())
 }

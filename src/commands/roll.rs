@@ -1,32 +1,24 @@
-use std::{fmt::Display, sync::Arc};
+use std::fmt::Display;
 
-use anyhow::{anyhow, Result};
 use async_recursion::async_recursion;
-use async_trait::async_trait;
 use rand::rngs::StdRng;
 use rand::Rng;
 use rand_distr::{Distribution, Normal};
-use serenity::{
-    builder::CreateApplicationCommand,
-    model::prelude::interaction::{
-        application_command::ApplicationCommandInteraction,
-        message_component::MessageComponentInteraction,
-    },
-};
+
+use poise::serenity_prelude::ComponentInteraction;
 use tracing::{error, info, warn};
 
 use crate::{
-    commands::utils::{display_result, update_choose_stats_message},
+    commands::utils::display_result,
     config::players::Player,
     config::{affinity::Affinity, stat::Stat, StatisticLaw},
-    Config, State,
+    Config,
 };
 
-use super::{
-    utils::{finish_interaction, get_mastery, send_choose_stats_message, send_yes_no_message},
-    Command,
+use super::utils::{
+    finish_interaction, get_mastery, send_choose_stats_message, send_yes_no_message,
 };
-
+use crate::{Context, Error};
 pub struct StatType {
     is_talent: bool,
     is_major_affinity: bool,
@@ -77,7 +69,7 @@ impl RollResult {
         new_mastery: i32,
         modifier: i32,
         successful: bool,
-    ) -> Result<Self> {
+    ) -> Result<Self, Error> {
         let stat_type = StatType {
             is_talent: player.is_talent(stat),
             is_major_affinity: player.is_major_affinity(stat, affinities)?,
@@ -133,7 +125,7 @@ fn get_roll_result(
     affinities: Option<&[Affinity]>,
     stat: Option<&Stat>,
     config: &Config,
-) -> Result<RollResult> {
+) -> Result<RollResult, Error> {
     // Roll a dice
     let roll = get_roll(config);
     info!("Rolled a {roll}");
@@ -172,19 +164,15 @@ fn get_roll_result(
                     successful,
                 )?)
             } else {
-                Err(anyhow!(
-                    "If player is specified affinities should be specified too"
-                ))
+                Err("If player is specified affinities should be specified too".into())
             }
         } else {
-            Err(anyhow!(
-                "If player is specified a stat should be specified too"
-            ))
+            Err("If player is specified a stat should be specified too".into())
         }
     } else {
         Ok(RollResult::new(
             roll,
-            discord_name.ok_or_else(|| anyhow!("No player or discord name specified"))?,
+            discord_name.ok_or("No player or discord name specified")?,
         ))
     }
 }
@@ -193,19 +181,19 @@ fn get_roll_result(
 /// Handle the recursion needed to go through the stat tree
 #[async_recursion]
 async fn choose_stat(
-    ctx: &serenity::prelude::Context,
-    interaction: Arc<MessageComponentInteraction>,
+    ctx: &Context<'_>,
+    interaction: ComponentInteraction,
     player_path: &str,
     affinities: &[Affinity],
     stats: &[Stat],
     config: &Config,
-) -> Result<(RollResult, Arc<MessageComponentInteraction>)> {
+) -> Result<(RollResult, ComponentInteraction), Error> {
     let res_id = interaction.data.custom_id.to_string();
 
     // Get the stat selected by the user
     if res_id == "abort" {
-        finish_interaction(ctx, &interaction, "Command aborted").await?;
-        return Err(anyhow!("Aborted by user"));
+        finish_interaction(ctx, interaction, "Command aborted").await?;
+        return Err("Aborted by user".into());
     }
     let stat = stats.iter().find(|&s| s.id == res_id).unwrap().clone();
     info!("Selected stat {}", stat.display_name);
@@ -213,7 +201,8 @@ async fn choose_stat(
     // If the stat has substats, we should let the user select one
     if !stat.sub_stats.is_empty() {
         // Recursion to check the stat chosen by the user
-        let interaction = update_choose_stats_message(ctx, &interaction, &stat.sub_stats).await?;
+        let interaction =
+            send_choose_stats_message(ctx, Some(interaction), &stat.sub_stats).await?;
         choose_stat(
             ctx,
             interaction,
@@ -238,80 +227,59 @@ async fn choose_stat(
 }
 
 async fn proceed_without_player_stats(
-    ctx: &serenity::prelude::Context,
-    command: &ApplicationCommandInteraction,
+    ctx: &Context<'_>,
     discord_name: &str,
-) -> Result<Arc<MessageComponentInteraction>> {
+) -> Result<ComponentInteraction, Error> {
     let interaction = send_yes_no_message(
         ctx,
-        command,
         &format!("No player stats found for player {discord_name} and you are not a game master.\nDo you still want to proceed?"),
     )
-    .await
-    .unwrap();
+    .await?;
 
     if &interaction.data.custom_id == "yes" {
         Ok(interaction)
     } else {
-        finish_interaction(ctx, &interaction, "Command aborted").await?;
-        Err(anyhow!("Aborted by user"))
+        finish_interaction(ctx, interaction, "Command aborted").await?;
+        Err("Aborted by user".into())
     }
 }
 
-/// Roll a dice for the stat you choose
-/// The dice follows a uniform distribution
-pub async fn roll(
-    ctx: &serenity::prelude::Context,
-    command: &ApplicationCommandInteraction,
-    state: &State,
-) -> Result<()> {
-    let discord_name = &command.user.name;
+/// Roll a dice for the stat you choose. Your experience will be updated based on the result.
+#[poise::command(slash_command)]
+pub async fn roll(ctx: Context<'_>) -> Result<(), Error> {
+    let discord_name = &ctx.author().name;
 
     // Getting info for the player from his discord name
     info!("Retrieving player info for {discord_name}");
-    let player = state.players.get(discord_name).map(|x| &**x);
-    let is_game_master = discord_name == &state.config.game_master_discord_name;
+    let player = ctx.data().players.get(discord_name);
+    let is_game_master = discord_name == &ctx.data().config.game_master_discord_name;
     let (roll_result, interaction) = if player.is_none() && !is_game_master {
         warn!("Could not find info for player {discord_name}");
-        let interaction = proceed_without_player_stats(ctx, command, discord_name).await?;
+        let interaction = proceed_without_player_stats(&ctx, discord_name).await?;
         info!("Proceeding without info");
-        let roll_result = get_roll_result(Some(discord_name), None, None, None, &state.config)?;
+        let roll_result =
+            get_roll_result(Some(discord_name), None, None, None, &ctx.data().config)?;
         (roll_result, Some(interaction))
     } else if player.is_none() && is_game_master {
         info!("Skipping player info retrieval for game master");
-        let roll_result = get_roll_result(Some(discord_name), None, None, None, &state.config)?;
+        let roll_result =
+            get_roll_result(Some(discord_name), None, None, None, &ctx.data().config)?;
         (roll_result, None)
     } else {
         info!("Successfully retrieved player info for {discord_name}");
-        let interaction = send_choose_stats_message(ctx, command, &state.stats).await?;
+        let interaction = send_choose_stats_message(&ctx, None, &ctx.data().stats).await?;
         // Guide the user through the stat tree to choose a stat
         let (roll_result, interaction) = choose_stat(
-            ctx,
+            &ctx,
             interaction,
-            player.unwrap(),
-            &state.affinities,
-            &state.stats,
-            &state.config,
+            player.ok_or("Invalid player")?,
+            &ctx.data().affinities,
+            &ctx.data().stats,
+            &ctx.data().config,
         )
         .await?;
         (roll_result, Some(interaction))
     };
-    display_result(ctx, interaction, Some(command), &roll_result).await?;
+    display_result(&ctx, interaction, &roll_result).await?;
     Ok(())
-}
-
-pub struct Roll;
-
-#[async_trait]
-impl Command for Roll {
-    async fn run(
-        ctx: &serenity::prelude::Context,
-        command: &ApplicationCommandInteraction,
-        state: &State,
-    ) -> Result<()> {
-        roll(ctx, command, state).await
-    }
-    fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-        command.name("roll").description("Roll the dice!")
-    }
 }

@@ -1,78 +1,28 @@
-use std::borrow::Borrow;
 use std::env;
 
-use anyhow::anyhow;
-use rp_tool::commands;
-use rp_tool::commands::Command;
+use poise::samples::register_in_guild;
+use poise::serenity_prelude::{Client, GatewayIntents};
+use poise::{Framework, FrameworkOptions};
+use rp_tool::commands::dice::dice;
+use rp_tool::commands::ping::ping;
+use rp_tool::commands::roll::roll;
+use rp_tool::commands::summary::summary;
 use rp_tool::State;
-use serenity::client::{Context, EventHandler};
-use serenity::model::prelude::interaction::Interaction;
-use serenity::model::prelude::{GuildId, Ready};
-use serenity::prelude::{GatewayIntents, RwLock};
-use serenity::{async_trait, Client};
 use tracing::{error, info};
 
-struct Handler;
+use rp_tool::Error;
 
-#[async_trait]
-impl EventHandler for Handler {
-    /// Handler for the `ready` event
-    /// Called when the bot joins the server
-    async fn ready(&self, ctx: Context, ready: Ready) {
-        for command in [
-            commands::ping::Ping::register,
-            commands::roll::Roll::register,
-            commands::dice::Dice::register,
-            commands::summary::Summary::register,
-        ] {
-            if let Ok(guild_id) = env::var("GUILD_ID") {
-                let guild = GuildId(guild_id.parse().expect("Wrong guild id set"));
-                if let Err(e) = guild.create_application_command(&ctx, |c| command(c)).await {
-                    error!("Could not register slash commands to guild: {e}");
-                }
-            } else if let Err(e) =
-                serenity::model::application::command::Command::create_global_application_command(
-                    &ctx.http,
-                    |c| command(c),
-                )
-                .await
-            {
-                error!("Could not register slash commands: {e}");
-            }
+async fn on_error(error: poise::FrameworkError<'_, State, Error>) {
+    // They are many errors that can occur, so we only handle the ones we want to customize
+    // and forward the rest to the default handler
+    match error {
+        poise::FrameworkError::Setup { error, .. } => panic!("Failed to start bot: {:?}", error),
+        poise::FrameworkError::Command { error, ctx, .. } => {
+            println!("Error in command `{}`: {:?}", ctx.command().name, error,);
         }
-
-        info!("{} is connected!", ready.user.name);
-    }
-
-    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::ApplicationCommand(command) = interaction {
-            let data = ctx.data.read().await;
-            let state = data.get::<State>().unwrap();
-            info!(
-                "Received command interaction: {:#?}",
-                command.data.name.as_str()
-            );
-
-            let command_name = command.data.name.as_str();
-            let result = match command_name {
-                "ping" => {
-                    commands::ping::Ping::run(&ctx, &command, state.read().await.borrow()).await
-                }
-                "roll" => {
-                    commands::roll::Roll::run(&ctx, &command, state.read().await.borrow()).await
-                }
-                "dice" => {
-                    commands::dice::Dice::run(&ctx, &command, state.read().await.borrow()).await
-                }
-                "summary" => {
-                    commands::summary::Summary::run(&ctx, &command, state.read().await.borrow())
-                        .await
-                }
-                _ => Err(anyhow!("Unimplemented command")),
-            };
-            match result {
-                Ok(()) => info!("Executed {command_name} command successfully"),
-                Err(e) => error!("Failed to execute {command_name} command: {e}"),
+        error => {
+            if let Err(e) = poise::builtins::on_error(error).await {
+                println!("Error while handling error: {}", e)
             }
         }
     }
@@ -104,21 +54,6 @@ async fn main() {
     });
     info!("Found discord token in .env file");
 
-    // Set gateway intents, which decides what events the bot will be notified about
-    // The MESSAGE_CONTENT intent requires special authorizations for the bot
-    let intents = GatewayIntents::GUILD_MESSAGES
-        | GatewayIntents::DIRECT_MESSAGES
-        | GatewayIntents::MESSAGE_CONTENT;
-
-    // Create a new instance of the Client, logging in as a bot.
-    let mut client = Client::builder(&token, intents)
-        .event_handler(Handler)
-        .await
-        .unwrap_or_else(|e| {
-            panic!("Error creating client: {e}");
-        });
-    info!("Client is setup");
-
     // Parse the config files and save them
     let state = match State::from_config_files() {
         Ok(s) => s,
@@ -128,12 +63,37 @@ async fn main() {
     };
     info!("Config files loaded successfully");
 
-    // Add our global state to the client
-    // Wrapped in a block to close the write lock before starting the client
-    {
-        let mut data = client.data.write().await;
-        data.insert::<State>(RwLock::new(state));
-    }
+    let framework = Framework::builder()
+        .options(FrameworkOptions {
+            commands: vec![ping(), roll(), summary(), dice()],
+            on_error: |error| Box::pin(on_error(error)),
+            ..Default::default()
+        })
+        .setup(move |ctx, ready, framework| {
+            Box::pin(async move {
+                for guild in &ready.guilds {
+                    register_in_guild(ctx, &framework.options().commands, guild.id).await?;
+                }
+                Ok(state)
+            })
+        })
+        .build();
+
+    // Set gateway intents, which decides what events the bot will be notified about
+    // The MESSAGE_CONTENT intent requires special authorizations for the bot
+    let intents = GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::DIRECT_MESSAGES
+        | GatewayIntents::MESSAGE_CONTENT;
+
+    // Create a new instance of the Client, logging in as a bot.
+    let mut client = Client::builder(&token, intents)
+        .framework(framework)
+        .await
+        .unwrap_or_else(|e| {
+            panic!("Error creating client: {e}");
+        });
+    info!("Client is setup");
+
     // Finally, start a single shard, and start listening to events.
     if let Err(err) = client.start().await {
         panic!("Client error: {err:?}");

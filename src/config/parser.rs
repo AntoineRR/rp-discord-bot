@@ -1,13 +1,13 @@
 use std::fs;
 
-use anyhow::Result;
+use crate::Error;
 
 pub trait TreeStructure {
     fn get_children(&self) -> &[Self]
     where
         Self: Clone;
 
-    fn from_line(line: &str, children: &[Self]) -> Result<Self>
+    fn from_line(line: &str, children: &[Self]) -> Result<Self, Error>
     where
         Self: Sized;
 
@@ -73,7 +73,7 @@ fn get_indent_level(line: &str) -> usize {
 }
 
 // Build a stat tree based on the stats as lines, by parsing the line's indentation
-fn build_tree<T: TreeStructure>(lines: &[ParsedLine], index: usize) -> Result<T> {
+fn build_tree<T: TreeStructure>(lines: &[ParsedLine], index: usize) -> Result<T, Error> {
     if index + 1 >= lines.len() {
         return T::from_line(&lines[index].value, &[]);
     }
@@ -91,7 +91,7 @@ fn build_tree<T: TreeStructure>(lines: &[ParsedLine], index: usize) -> Result<T>
 }
 
 /// Get the stat tree from the stats.txt file
-pub fn get_tree<T: TreeStructure + Clone>(path: &str) -> Result<Vec<T>> {
+pub fn get_tree<T: TreeStructure + Clone>(path: &str) -> Result<Vec<T>, Error> {
     let file_content = fs::read_to_string(path).expect("Could not read stats file");
     // A root node is needed to build the Stat tree
     let mut parsed_lines = vec![ParsedLine::root()];

@@ -1,157 +1,141 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
-use anyhow::{anyhow, Context, Result};
-use serenity::{
-    builder::{CreateButton, CreateComponents},
-    model::prelude::{
-        component::ButtonStyle,
-        interaction::{
-            application_command::ApplicationCommandInteraction,
-            message_component::MessageComponentInteraction, InteractionResponseType,
-        },
-    },
+use poise::serenity_prelude::{
+    ButtonStyle, ComponentInteraction, ComponentInteractionCollector, CreateActionRow,
+    CreateButton, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
+use poise::CreateReply;
 use tracing::info;
 
-use crate::config::{affinity::Affinity, players::Player, stat::Stat, Config};
+use crate::{
+    config::{affinity::Affinity, players::Player, stat::Stat, Config},
+    State,
+};
 
 use super::roll::RollResult;
 
+type Error = Box<dyn std::error::Error + Send + Sync>;
+type Context<'a> = poise::Context<'a, State, Error>;
+
 /// Build a button based on an id and display string
 pub fn button(id: &str, display_name: &str, style: ButtonStyle) -> CreateButton {
-    let mut b = CreateButton::default();
-    b.custom_id(id);
-    b.label(display_name);
-    b.style(style);
-    b
+    CreateButton::new(id).label(display_name).style(style)
 }
 
-/// Build a set of rows containing 5 buttons each at most
-pub fn buttons_from_stats<'a>(
-    components: &'a mut CreateComponents,
-    stats: &[Stat],
-) -> &'a mut CreateComponents {
-    stats.chunks(5).for_each(|chunk| {
-        components.create_action_row(|row| {
-            chunk.iter().for_each(|stat| {
-                let style = match stat.sub_stats.is_empty() {
-                    true => ButtonStyle::Secondary,
-                    false => ButtonStyle::Success,
-                };
-                row.add_button(button(&stat.id, &stat.display_name, style));
-            });
-            row
-        });
-    });
-    components
-        .create_action_row(|row| row.add_button(button("abort", "Abort", ButtonStyle::Danger)))
+pub fn get_stats_buttons(stats: &[Stat]) -> Vec<CreateActionRow> {
+    let mut buttons = stats
+        .chunks(5)
+        .map(|chunk| {
+            CreateActionRow::Buttons(
+                chunk
+                    .iter()
+                    .map(|stat| {
+                        let style = match stat.sub_stats.is_empty() {
+                            true => ButtonStyle::Secondary,
+                            false => ButtonStyle::Success,
+                        };
+                        button(&stat.id, &stat.display_name, style)
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .collect::<Vec<_>>();
+    buttons.push(CreateActionRow::Buttons(vec![button(
+        "abort",
+        "Abort",
+        ButtonStyle::Danger,
+    )]));
+    buttons
 }
 
 /// Build a row with a yes and a no button
-pub fn yes_no_buttons(components: &mut CreateComponents) -> &mut CreateComponents {
-    components.create_action_row(|row| {
-        row.add_button(button("yes", "Yes", ButtonStyle::Primary));
-        row.add_button(button("no", "No", ButtonStyle::Primary))
-    })
+pub fn yes_no_buttons() -> CreateActionRow {
+    CreateActionRow::Buttons(vec![
+        button("yes", "Yes", ButtonStyle::Primary),
+        button("no", "No", ButtonStyle::Primary),
+    ])
 }
 
 /// Send a message asking to choose between the given stats
 pub async fn send_choose_stats_message(
-    ctx: &serenity::prelude::Context,
-    command: &ApplicationCommandInteraction,
+    ctx: &Context<'_>,
+    interaction: Option<ComponentInteraction>,
     stats: &[Stat],
-) -> Result<Arc<MessageComponentInteraction>> {
+) -> Result<ComponentInteraction, Error> {
     info!("Asking user to choose a stat");
-    command
-        .create_interaction_response(ctx, |c| {
-            c.interaction_response_data(|m| {
-                m.ephemeral(true)
+    if let Some(int) = interaction {
+        int.create_response(
+            ctx,
+            CreateInteractionResponse::UpdateMessage(
+                CreateInteractionResponseMessage::default()
                     .content("Choose your stat / stat family")
-                    .components(|c| buttons_from_stats(c, stats))
-            })
-        })
+                    .components(get_stats_buttons(stats)),
+            ),
+        )
         .await?;
-    command
-        .get_interaction_response(ctx)
-        .await?
-        .await_component_interaction(ctx)
-        .timeout(Duration::from_secs(3 * 60))
-        .await
-        .context("Interaction failed")
-}
+    } else {
+        ctx.send(
+            CreateReply::default()
+                .ephemeral(true)
+                .content("Choose your stat / stat family")
+                .components(get_stats_buttons(stats)),
+        )
+        .await?;
+    }
 
-/// Send a message asking to choose between the given stats
-pub async fn update_choose_stats_message(
-    ctx: &serenity::prelude::Context,
-    interaction: &MessageComponentInteraction,
-    stats: &[Stat],
-) -> Result<Arc<MessageComponentInteraction>> {
-    info!("Asking user to choose a stat");
-    interaction
-        .create_interaction_response(ctx, |c| {
-            c.kind(InteractionResponseType::UpdateMessage)
-                .interaction_response_data(|m| {
-                    m.ephemeral(true)
-                        .content("Choose your stat / stat family")
-                        .components(|c| buttons_from_stats(c, stats))
-                })
-        })
-        .await?;
-    interaction
-        .get_interaction_response(ctx)
-        .await?
-        .await_component_interaction(ctx)
-        .timeout(Duration::from_secs(3 * 60))
+    Ok(ComponentInteractionCollector::new(ctx)
+        .author_id(ctx.author().id)
+        .channel_id(ctx.channel_id())
+        .timeout(Duration::from_secs(60))
         .await
-        .context("Interaction failed")
+        .ok_or("Interaction failed")?)
 }
 
 /// Send a message asking the user to answer a question with yes or no
 pub async fn send_yes_no_message(
-    ctx: &serenity::prelude::Context,
-    command: &ApplicationCommandInteraction,
+    ctx: &Context<'_>,
     content: &str,
-) -> Result<Arc<MessageComponentInteraction>> {
-    command
-        .create_interaction_response(ctx, |c| {
-            c.interaction_response_data(|m| {
-                m.content(content)
-                    .ephemeral(true)
-                    .components(yes_no_buttons)
-            })
-        })
+) -> Result<ComponentInteraction, Error> {
+    ctx.send(
+        CreateReply::default()
+            .ephemeral(true)
+            .content(content)
+            .components(vec![yes_no_buttons()]),
+    )
+    .await?;
+    Ok(ComponentInteractionCollector::new(ctx)
+        .author_id(ctx.author().id)
+        .channel_id(ctx.channel_id())
+        .timeout(Duration::from_secs(60))
         .await
-        .context("Failed to write message")?;
-    command
-        .get_interaction_response(&ctx)
-        .await?
-        .await_component_interaction(ctx)
-        .timeout(Duration::from_secs(3 * 60))
-        .await
-        .context("Interaction failed")
+        .ok_or("Interaction failed")?)
 }
 
 /// Conclude an interaction by updating the message to a non interactive one
 pub async fn finish_interaction(
-    ctx: &serenity::prelude::Context,
-    interaction: &MessageComponentInteraction,
+    ctx: &Context<'_>,
+    interaction: ComponentInteraction,
     content: &str,
-) -> Result<()> {
+) -> Result<(), Error> {
     interaction
-        .create_interaction_response(ctx, |c| {
-            c.kind(InteractionResponseType::UpdateMessage)
-                .interaction_response_data(|d| d.ephemeral(true).content(content).components(|c| c))
-        })
-        .await
-        .context("Failed to update message")
+        .create_response(
+            ctx,
+            CreateInteractionResponse::UpdateMessage(
+                CreateInteractionResponseMessage::default()
+                    .content(content)
+                    .components(vec![])
+                    .ephemeral(true),
+            ),
+        )
+        .await?;
+    Ok(())
 }
 
 pub async fn display_result(
-    ctx: &serenity::prelude::Context,
-    interaction: Option<Arc<MessageComponentInteraction>>,
-    command: Option<&ApplicationCommandInteraction>,
+    ctx: &Context<'_>,
+    interaction: Option<ComponentInteraction>,
     roll_result: &RollResult,
-) -> Result<()> {
+) -> Result<(), Error> {
     let title = match &roll_result.successful {
         Some(true) => "SUCCESS",
         Some(false) => "FAILURE",
@@ -176,47 +160,32 @@ pub async fn display_result(
         fields.push(("Stat", mas_display, true));
     }
 
-    let channel_id = if let Some(int) = interaction {
-        int.create_interaction_response(ctx, |r| {
-            r.kind(InteractionResponseType::UpdateMessage)
-                .interaction_response_data(|d| {
-                    d.content("Successfully rolled dice").components(|c| c)
-                })
-        })
-        .await?;
-        int.channel_id
-    } else if let Some(com) = command {
-        com.create_interaction_response(ctx, |r| {
-            r.interaction_response_data(|d| {
-                d.content("Successfully rolled dice")
-                    .ephemeral(true)
-                    .components(|c| c)
-            })
-        })
-        .await?;
-        com.channel_id
-    } else {
-        return Err(anyhow!("No interaction or command specified"));
-    };
+    // Acknowledge the interaction and delete the ephemeral interaction
+    if let Some(int) = interaction {
+        int.create_response(ctx, CreateInteractionResponse::Acknowledge)
+            .await?;
+        int.delete_response(ctx).await?;
+    }
 
-    channel_id
-        .send_message(ctx, |d| {
-            d.content("")
-                .embed(|e| e.title(title).description(description).fields(fields))
-                .components(|c| c)
-        })
-        .await?;
+    ctx.send(
+        CreateReply::default().content("").ephemeral(false).embed(
+            CreateEmbed::default()
+                .title(title)
+                .description(description)
+                .fields(fields),
+        ),
+    )
+    .await?;
 
     if let Some(stat) = &roll_result.stat {
         if let Some(t) = roll_result.mastery {
             if let Some(m) = roll_result.new_mastery {
                 if m > t {
                     // Level up, the threshold will be higher for next rolls
-                    channel_id
-                        .send_message(ctx, |d| {
-                            d.content(format!("🎉 Improved stat {stat} to {m}!"))
-                        })
-                        .await?;
+                    ctx.send(
+                        CreateReply::default().content(format!("🎉 Leveled up {stat} to {m}!")),
+                    )
+                    .await?;
                 }
             }
         }
@@ -229,8 +198,11 @@ pub fn get_mastery(
     stat: &str,
     config: &Config,
     affinities: &[Affinity],
-) -> Result<i32> {
-    let player_experience = *p.stats.get(stat).unwrap();
+) -> Result<i32, Error> {
+    let player_experience = *p
+        .stats
+        .get(stat)
+        .ok_or(format!("Stat {stat} not found for player"))?;
     let is_talent = p.is_talent(stat);
     let is_major_affinity = p.is_major_affinity(stat, affinities)?;
     let is_minor_affinity = p.is_minor_affinity(stat, affinities)?;
