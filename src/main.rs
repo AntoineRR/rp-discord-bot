@@ -37,15 +37,20 @@ async fn main() {
         std::io::stdin().read_line(&mut String::new()).unwrap();
     }));
 
+    let subscriber = tracing_subscriber::FmtSubscriber::new();
+    tracing::subscriber::set_global_default(subscriber)
+        .unwrap_or_else(|e| panic!("Unable to set global default subscriber: {e}"));
+
     // Setup tracing
     #[cfg(target_os = "windows")]
     {
         // Enable ANSI support on windows to get colors in the console
-        ansi_term::enable_ansi_support().unwrap();
+        let version = winver::WindowsVersion::detect().unwrap();
+        info!("Detected Windows version: {version}");
+        if version >= winver::WindowsVersion::new(10, 0, 0) {
+            ansi_term::enable_ansi_support().unwrap();
+        }
     }
-    let subscriber = tracing_subscriber::FmtSubscriber::new();
-    tracing::subscriber::set_global_default(subscriber)
-        .unwrap_or_else(|e| panic!("Unable to set global default subscriber: {e}"));
 
     // Get the discord token from a .env file
     dotenv::dotenv().ok();
